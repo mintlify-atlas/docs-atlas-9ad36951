@@ -1,97 +1,74 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "GNU Hyperbole"
+description: "The Everyday Hypertextual Information Manager for GNU Emacs — smart hyperbuttons, a hierarchical outliner, contact manager, wiki note-taking, and window control in one package."
 ---
 
-## Setting up
+GNU Hyperbole is a powerful, programmable hypertextual information management system built as a GNU Emacs package. It transforms your text into an interconnected web of smart hyperlinks with a single key press — no markup language required. Load it once, and your buffers come to life.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Hyperbole via the Emacs package manager in minutes
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Learn the essential keys and try the interactive demo
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Core Concepts" icon="lightbulb" href="/concepts/buttons">
+    Understand buttons, Smart Keys, and implicit button types
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Developer Guide" icon="code" href="/api/overview">
+    Extend Hyperbole with custom button and action types
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## What is Hyperbole?
 
-Everything you need to create world-class documentation.
+Hyperbole automatically recognizes dozens of common patterns in any buffer regardless of mode and activates them as hyperbuttons with a single key. Email addresses, URLs, grep output, git commits, programming backtraces, Org links, Info cross-references, and more all become instantly clickable — no markup required.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Buttons & Smart Keys" icon="computer-mouse" href="/concepts/buttons">
+    Context-sensitive Action Key and Assist Key that do the right thing everywhere. Create explicit hyperbuttons by dragging between windows.
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="HyWiki" icon="book" href="/features/hywiki">
+    Markup-free personal wiki using Org mode. WikiWords automatically become hyperlinks to their pages without any delimiters.
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Koutliner" icon="list-tree" href="/features/koutliner">
+    Multi-level autonumbered outliner with permanent hyperlink anchors on every node. Renumbering is automatic as you move nodes.
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="HyRolo" icon="address-book" href="/features/hyrolo">
+    Hierarchical contact manager and fast full-text record search with expand/collapse results.
   </Card>
-</Columns>
+  <Card title="HyControl" icon="window-restore" href="/features/hycontrol">
+    Fastest window and frame manager for Emacs. Resize, move, and configure your layout with single keystrokes.
+  </Card>
+  <Card title="Programming Library" icon="puzzle-piece" href="/api/overview">
+    Full Emacs Lisp API for integrating Hyperbole into your own tools and defining custom button types.
+  </Card>
+</CardGroup>
 
-## Need inspiration?
+## Get started in 3 steps
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Steps>
+  <Step title="Install via the Emacs Package Manager">
+    Add these lines to your `~/.emacs` or `~/.emacs.d/init.el`:
+
+    ```emacs-lisp
+    (require 'package)
+    (unless (package-installed-p 'hyperbole)
+      (package-refresh-contents)
+      (package-install 'hyperbole))
+    (hyperbole-mode 1)
+    ```
+
+    Restart Emacs and Hyperbole will download, compile, and activate automatically.
+  </Step>
+  <Step title="Open the interactive demo">
+    Press `C-h h d d` to launch the interactive DEMO file, which walks you through Hyperbole's button capabilities hands-on. This is the fastest way to learn.
+  </Step>
+  <Step title="Press the Action Key">
+    Move point over any URL, file path, email address, or other recognizable pattern in any buffer and press `M-RET` (the Action Key). Hyperbole activates it automatically.
+  </Step>
+</Steps>
+
+<Note>
+  Hyperbole works with GNU Emacs 28 or above and requires no external dependencies beyond standard Emacs libraries.
+</Note>

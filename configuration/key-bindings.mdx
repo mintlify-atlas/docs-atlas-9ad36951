@@ -1,0 +1,194 @@
+---
+title: "Key Bindings"
+description: "Default keyboard shortcuts for GNU Hyperbole, including the Action Key, Assist Key, menus, and HyControl. Covers rebinding and conflict resolution."
+---
+
+Hyperbole establishes its key bindings through `hkey-initialize`, which is called during startup when `hkey-init` is non-nil (the default). All bindings are placed in `hyperbole-mode-map`, the keymap for Hyperbole's global minor mode, so they are only active when `hyperbole-mode` is enabled.
+
+## Default Key Bindings
+
+### Core Keys
+
+| Key | Command | Description |
+|---|---|---|
+| `M-RET` | `hkey-either` | **Action Key** — context-sensitive activation |
+| `C-u M-RET` | `hkey-either` (with prefix) | **Assist Key** — context-sensitive help/secondary action |
+| `C-h h` | `hyperbole` | Open the Hyperbole main minibuffer menu |
+| `C-h A` | `hkey-help` | Show what the Action Key will do at point |
+| `C-u C-h A` | `hkey-help` (with prefix) | Show what the Assist Key will do at point |
+
+<Note>
+`M-RET` is bound to all of its common key sequence variants: `M-<return>`, `ESC <return>`, and `ESC RET`. This ensures Hyperbole can override `org-meta-return` in Org mode when desired.
+</Note>
+
+### Navigation and Selection
+
+| Key | Command | Description |
+|---|---|---|
+| `C-c RET` (`C-c C-m`) | `hui-select-thing` | Select progressively larger syntactic units at point |
+| `C-c .` | `hui-select-goto-matching-delimiter` | Jump between the start and end of a delimited thing |
+| `M-o` | `hkey-operate` | Emulate mouse drag commands from keyboard (window systems only) |
+
+### Window and Frame Control
+
+| Key | Command | Description |
+|---|---|---|
+| `C-c \` | `hycontrol-enable-windows-mode` | Enter interactive window management mode |
+| `C-c @` | `hycontrol-windows-grid` | Create a grid of windows displaying different buffers |
+
+### Search
+
+| Key | Command | Description |
+|---|---|---|
+| `C-c /` | `hui-search-web` | Open the Hyperbole Find/Web search menu |
+
+### Kill and Copy (Remapped)
+
+| Original Command | Hyperbole Replacement | Description |
+|---|---|---|
+| `kill-region` (`C-w`) | `hui:kill-region` | Kill region, kcell references, or delimited areas |
+| `kill-ring-save` (`M-w`) | `hui:kill-ring-save` | Copy delimited things or kcell references to kill ring |
+| `copy-to-register` (`C-x r s`) | `hui:copy-to-register` | Copy delimited things or kcell references to a register |
+
+### Hyperbole Menu Navigation
+
+These key sequences navigate through the Hyperbole minibuffer menu (accessed via `C-h h`):
+
+| Key Sequence | Description |
+|---|---|
+| `C-h h d d` | Start the interactive Hyperbole DEMO |
+| `C-h h d i` | Browse the Hyperbole Info manual |
+| `C-h h k e` | Start the interactive Koutliner demo |
+| `C-h h s w` | Enter HyControl window management mode |
+| `C-h h s f` | Enter HyControl frame management mode |
+| `C-h h r` | Open the HyRolo menu |
+| `C-h h b` | Open the Button menu |
+| `C-h h w` | Open the HyWiki menu |
+| `C-h h f` | Open the Find/Web search menu |
+
+### Mouse Bindings
+
+Hyperbole installs Smart Key mouse bindings via `hmouse-install`. Shifted mouse buttons are always bound. When `hmouse-middle-flag` is non-nil (the default), the middle mouse button is also bound as an Action Key.
+
+| Mouse Event | Action |
+|---|---|
+| `S-mouse-2` (shift + middle click) | Action Key |
+| `S-mouse-3` (shift + right click) | Assist Key |
+| Middle click (when `hmouse-middle-flag` is `t`) | Action Key |
+| Double/triple left click | Same as `C-c RET` (`hui-select-thing`) |
+
+<Info>
+Mouse bindings are ignored on frames that do not have mouse support.
+</Info>
+
+---
+
+## Rebinding the Action Key
+
+The Action Key is bound to `hkey-either`. To rebind it, use `hkey-set-key` (the preferred Hyperbole API) or the standard `define-key` on `hyperbole-mode-map`:
+
+```emacs-lisp
+;; Rebind the Action Key to a different key using hkey-set-key
+(hkey-set-key (kbd "C-c a") #'hkey-either)
+```
+
+You can also do this interactively:
+
+```
+M-x hkey-set-key RET
+```
+
+To bind a key only if it is not already taken in `hyperbole-mode-map`:
+
+```emacs-lisp
+(hkey-maybe-set-key (kbd "C-c a") #'hkey-either)
+```
+
+---
+
+## Rebinding the Assist Key
+
+The Assist Key is invoked by prefixing the Action Key binding with `C-u`. There is no separate command for the Assist Key — it is the same `hkey-either` command, which dispatches to Assist Key behavior when called with a prefix argument.
+
+To give the Assist Key its own dedicated binding:
+
+```emacs-lisp
+;; Bind the Assist Key to C-c ; (calls hkey-either with a simulated prefix)
+(hkey-set-key (kbd "C-c ;") (lambda () (interactive)
+                               (let ((current-prefix-arg '(4)))
+                                 (call-interactively #'hkey-either))))
+```
+
+---
+
+## Disabling Key Initialization
+
+To prevent Hyperbole from installing any of its key bindings at startup, set `hkey-init` to `nil` before loading Hyperbole:
+
+```emacs-lisp
+(setq hkey-init nil)
+(require 'hyperbole)
+```
+
+With `hkey-init` set to `nil`, no Hyperbole keys are bound and you must configure all bindings manually.
+
+---
+
+## Conflicts with Other Packages
+
+### Org Mode (`M-RET`)
+
+Org mode binds `M-RET` to `org-meta-return`. Hyperbole also wants `M-RET` for the Action Key. The `hsys-org-enable-smart-keys` variable controls how this conflict is resolved:
+
+| `hsys-org-enable-smart-keys` | `M-RET` in Org buffers |
+|---|---|
+| `'buttons` | Activates Hyperbole/Org buttons and links; otherwise falls back to `org-meta-return` |
+| `nil` | Always runs `org-meta-return`; Hyperbole Action Key is inactive in Org |
+| `t` | Always runs Hyperbole Action Key; `org-meta-return` is not available as a fallback |
+
+```emacs-lisp
+;; Recommended: let Smart Keys work on buttons only in Org mode
+(customize-set-variable 'hsys-org-enable-smart-keys 'buttons)
+```
+
+### Helm (`helm-allow-mouse`)
+
+`hsettings.el` includes special handling for Helm. If the `global_mouse` branch of Helm is in use, Hyperbole sets `helm-allow-mouse` to `'global-mouse-bindings` so Smart Mouse Keys work within Helm completion:
+
+```emacs-lisp
+;; This is set automatically in hsettings.el when the modified Helm is detected.
+;; Only applies with the https://github.com/rswgnu/helm/tree/global_mouse branch.
+(eval-after-load "helm"
+  '(if (boundp 'helm--disable-mouse-mode)
+       (setq helm-allow-mouse 'global-mouse-bindings)))
+```
+
+If you change this, restart Emacs for the change to take effect.
+
+### `facemenu` (`M-o`)
+
+When running under a window system, Hyperbole binds `M-o` to `hkey-operate` for keyboard-based mouse drag emulation. If `facemenu` has previously bound `M-o` to `facemenu-keymap`, Hyperbole overrides that binding. In all other cases, `hkey-maybe-set-key` is used so existing bindings are preserved.
+
+---
+
+## Checking Current Bindings
+
+To see all active Hyperbole key bindings:
+
+```emacs-lisp
+;; Display Hyperbole's keymap
+(describe-keymap 'hyperbole-mode-map)
+```
+
+Or from the Emacs help system:
+
+```
+C-h m    ;; describe current mode; Hyperbole bindings appear in the minor mode section
+```
+
+To find which key invokes a specific Hyperbole command:
+
+```emacs-lisp
+(where-is-internal #'hkey-either hyperbole-mode-map)
+(where-is-internal #'hyperbole hyperbole-mode-map)
+```

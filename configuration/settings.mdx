@@ -1,0 +1,252 @@
+---
+title: "Settings"
+description: "User-configurable variables for GNU Hyperbole, including Smart Key behavior, file paths, HyWiki, HyRolo, and web search settings."
+---
+
+GNU Hyperbole's user-configurable settings live in two places:
+
+- **`hsettings.el`** — the primary site/user settings file. Read the comments in this file and modify as desired.
+- **Individual package files** — variables like `hywiki-directory` (in `hywiki.el`) and `hyrolo-file-list` (in `hyrolo.el`) are defined close to the features they control.
+
+## Using the Customize Interface
+
+The easiest way to explore and change Hyperbole settings is through Emacs's built-in Customize system:
+
+```
+M-x customize-group RET hyperbole RET
+```
+
+Hyperbole organizes its options into several sub-groups:
+
+| Group | Contents |
+|---|---|
+| `hyperbole` | Top-level group |
+| `hyperbole-buttons` | Button display and messaging support |
+| `hyperbole-commands` | Web search and command behavior |
+| `hyperbole-keys` | Keyboard and mouse key bindings |
+| `hyperbole-koutliner` | Koutliner outliner settings |
+| `hyperbole-screen` | Frame and window display settings |
+| `hyperbole-hyrolo` | HyRolo contact/search settings |
+| `hyperbole-hywiki` | HyWiki note-taking settings |
+
+## Key Variables
+
+### `hyperb:user-email`
+
+**File:** `hinit.el` | **Default:** derived from `user-mail-address` at startup
+
+Hyperbole stores the current user's email address in this variable. It is set automatically during initialization by `hyperb:init`, which reads `user-mail-address`. When a user creates an explicit button or edits a Koutline, Hyperbole records this address as the button's author.
+
+To ensure this is set correctly, place the following in your Emacs init file **before** loading Hyperbole:
+
+```emacs-lisp
+(setq user-mail-address "you@example.com")
+```
+
+---
+
+### `hpath:find-file-urls-mode`
+
+**File:** `hpath.el` | **Default:** `nil`
+
+When set to `t`, enables the use of FTP and HTTP URLs in Emacs file-finding commands (such as `find-file`). This requires a remote file access library to be available. The default is `nil` because enabling it can slow down normal file finding operations.
+
+```emacs-lisp
+;; Enable URL-based file finding (requires remote file access support)
+(setq hpath:find-file-urls-mode t)
+```
+
+Use `M-x customize-variable RET hpath:find-file-urls-mode RET` to toggle this interactively.
+
+---
+
+### `hsys-org-enable-smart-keys`
+
+**File:** `hsys-org.el` | **Default:** `'unset` (resolved at startup)
+
+Controls how Hyperbole's Smart Keys (`M-RET` Action Key and Assist Key) behave when point is in an Org major or minor mode buffer. This only applies when `hyperbole-mode` is active.
+
+If left at its default `'unset` value, Hyperbole sets it automatically during initialization based on whether `org-meta-return` already shares the `M-RET` binding.
+
+| Setting | Smart Key Context | Hyperbole Button | Org Link | Fallback |
+|---|---|---|---|---|
+| `'buttons` | Ignored | Activated | Activated | `org-meta-return` |
+| `nil` | Ignored | Ignored | Ignored | `org-meta-return` |
+| `t` | Activated | Activated | Activated | None |
+
+```emacs-lisp
+;; Only activate Smart Keys on Hyperbole buttons and Org links in Org mode
+(setq hsys-org-enable-smart-keys 'buttons)
+
+;; Disable Smart Keys entirely in Org mode
+(setq hsys-org-enable-smart-keys nil)
+
+;; Enable Smart Keys in all contexts in Org mode
+(setq hsys-org-enable-smart-keys t)
+```
+
+<Note>
+Use `customize-set-variable` rather than `setq` when changing this after Hyperbole has loaded, so that the associated setter function runs correctly.
+
+```emacs-lisp
+(customize-set-variable 'hsys-org-enable-smart-keys 'buttons)
+```
+</Note>
+
+---
+
+### `hywiki-directory`
+
+**File:** `hywiki.el` | **Default:** `"~/hywiki/"`
+
+The directory that holds all HyWiki pages in Org format. HyWiki automatically highlights WikiWords and turns them into hyperlinks to their corresponding `.org` files within this directory.
+
+```emacs-lisp
+;; Use a custom HyWiki directory
+(setq hywiki-directory "~/notes/wiki/")
+```
+
+<Warning>
+Use `customize-set-variable` or Customize to change this value so that the associated setter (`hywiki-set-directory`) runs. Simply using `setq` will work if `hywiki-directory` has a variable watcher installed (which it does by default in Hyperbole 9+), but `customize-set-variable` is the safest approach.
+</Warning>
+
+See `hywiki-org-publishing-directory` for the directory where HyWiki pages are exported to HTML format.
+
+---
+
+### `hyrolo-file-list`
+
+**File:** `hyrolo.el` | **Default:** `(list "~/.rolo.org")` or `(list "~/.rolo.otl")`
+
+A list of files that HyRolo searches for contact and text records. The default resolves to `~/.rolo.org` if that file exists and is readable, otherwise `~/.rolo.otl`.
+
+The first file should be user-specific (typically in `~`) and must have a suffix of `.org` or `.otl`. Additional files in the list may use `.org`, `.otl`, `.md` (Markdown), or `.kotl` (Koutline) suffixes.
+
+```emacs-lisp
+;; Search multiple files with HyRolo
+(setq hyrolo-file-list
+      '("~/.rolo.org"
+        "~/work/contacts.org"
+        "~/projects/notes.kotl"))
+```
+
+<Tip>
+HyRolo file entries begin with a line matching `hyrolo-hdr-and-entry-regexp`. An optional file header may appear at the top, delimited by lines matching `hyrolo-hdr-regexp`.
+</Tip>
+
+---
+
+### Smart Key Mouse Settings
+
+**File:** `hsettings.el`
+
+#### `hmouse-middle-flag`
+
+**Default:** `t` (or `infodock-version` value if InfoDock is loaded)
+
+When non-nil, the middle mouse button is additionally bound as an Action Key. Set to `nil` to disable this:
+
+```emacs-lisp
+(setq hmouse-middle-flag nil)
+```
+
+<Note>
+If you change this setting, you must restart Emacs for the new binding to take full effect.
+</Note>
+
+#### `smart-scroll-proportional`
+
+**Default:** `t`
+
+Controls scrolling behavior when the Action or Assist Key is pressed at the end of a line.
+
+- `t` — scrolls relative to the current line: Action Key moves current line to the top of the window; Assist Key moves it to the bottom. Repeated presses scroll by a windowful.
+- `nil` — always scrolls up or down a full windowful, ignoring the current line.
+
+```emacs-lisp
+;; Always scroll a full windowful
+(setq smart-scroll-proportional nil)
+```
+
+---
+
+### `inhibit-hyperbole-messaging`
+
+**File:** `hsettings.el` | **Default:** `t`
+
+When `t` (the default), disables Hyperbole's support for explicit buttons in mail and news buffers. This prevents Hyperbole from altering messaging-mode hooks or overloading functions from those packages.
+
+To enable button support in mail and news buffers, add the following to your init file **before** loading Hyperbole:
+
+```emacs-lisp
+(hyperbole-toggle-messaging 1)
+```
+
+Or equivalently via Customize:
+
+```emacs-lisp
+(customize-set-variable 'inhibit-hyperbole-messaging nil)
+```
+
+---
+
+### Web Search Settings
+
+**File:** `hsettings.el`
+
+#### `hyperbole-web-search-alist`
+
+A customizable association list mapping service names to URL templates (with `%s` as the search term placeholder) or to interactive functions.
+
+```emacs-lisp
+;; Add a custom search service
+(add-to-list 'hyperbole-web-search-alist
+             '("MySearch" . "https://example.com/search?q=%s"))
+```
+
+Changing this variable automatically rebuilds all Hyperbole menus via `hyperbole-update-menus`.
+
+#### `hyperbole-web-search-browser-function`
+
+**Default:** `browse-url-browser-function`
+
+The browser function used for all Hyperbole Find/Web searches. Customize to use a different browser than your Emacs default:
+
+```emacs-lisp
+;; Use EWW for all Hyperbole web searches
+(setq hyperbole-web-search-browser-function #'eww-browse-url)
+```
+
+---
+
+## Site-Specific Configuration Block
+
+`hsettings.el` reserves a dedicated section near the end of the file for local additions:
+
+```emacs-lisp
+;;; SITE-SPECIFIC ADDITIONS - Add your Hyperbole configuration additions here.
+```
+
+Place any custom Hyperbole configuration snippets in your personal Emacs init file after `(require 'hyperbole)` or `(hyperbole-mode 1)`, or add them to `hsettings.el` directly in that section.
+
+### Example: Typical User Configuration
+
+```emacs-lisp
+;; Set email before loading Hyperbole
+(setq user-mail-address "alice@example.com")
+
+(require 'hyperbole)
+
+;; Use a custom HyWiki directory
+(customize-set-variable 'hywiki-directory "~/wiki/")
+
+;; Search personal and shared rolo files
+(customize-set-variable 'hyrolo-file-list
+                        '("~/.rolo.org" "~/shared/team-contacts.org"))
+
+;; Use 'buttons mode for Org — Smart Keys work on buttons and Org links only
+(customize-set-variable 'hsys-org-enable-smart-keys 'buttons)
+
+;; Do not bind middle mouse button as Action Key
+(setq hmouse-middle-flag nil)
+```

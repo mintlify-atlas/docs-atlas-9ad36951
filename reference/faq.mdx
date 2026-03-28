@@ -1,0 +1,227 @@
+---
+title: "FAQ"
+description: "Answers to frequently asked questions about installing, using, and customizing GNU Hyperbole."
+---
+
+## Installation and setup
+
+<AccordionGroup>
+  <Accordion title="What version of Emacs does Hyperbole require?">
+    Hyperbole requires **GNU Emacs 28 or above**. This is declared in the `Package-Requires` header of `hyperbole.el`:
+
+    ```emacs-lisp
+    ;; Package-Requires: ((emacs "28"))
+    ```
+
+    Earlier versions of Emacs are not supported. The INSTALL file also warns at startup if you are running below the minimum version.
+  </Accordion>
+
+  <Accordion title="How do I install the stable release?">
+    Install from GNU ELPA using the built-in Emacs package manager. Add the following to your Emacs initialization file (typically `~/.emacs` or `~/.emacs.d/init.el`):
+
+    ```emacs-lisp
+    (require 'package)
+    (unless (package-installed-p 'hyperbole)
+      (package-refresh-contents)
+      (package-install 'hyperbole))
+    (hyperbole-mode 1)
+    ```
+
+    Save the file and restart Emacs. Hyperbole will be downloaded and compiled automatically. You may see byte-compilation warnings; these are safe to ignore.
+
+    If you already have Hyperbole 5.10 or higher installed and want to upgrade, run `M-x list-packages RET`, then press `U` followed by `x` to upgrade all outdated packages.
+  </Accordion>
+
+  <Accordion title="How do I install the latest development version?">
+    To track the in-development pre-release from GNU ELPA Devel, add the `gnu-devel` archive before installing:
+
+    ```emacs-lisp
+    (require 'package)
+    (add-to-list 'package-archives '("gnu-devel" . "https://elpa.gnu.org/devel/"))
+    (unless (package-installed-p 'hyperbole)
+      (package-refresh-contents)
+      (package-install 'hyperbole))
+    (hyperbole-mode 1)
+    ```
+
+    To track the git master branch using the Straight package manager instead:
+
+    ```emacs-lisp
+    (straight-use-package
+     '(hyperbole
+       :host nil
+       :repo "https://git.savannah.gnu.org/git/hyperbole.git"
+       :config (hyperbole-mode 1)))
+    ```
+
+    <Note>
+    The development branch is tested before being pushed, but new features are occasionally unstable for a short period. The stable ELPA release is recommended for most users.
+    </Note>
+  </Accordion>
+
+  <Accordion title="How do I activate Hyperbole after installing?">
+    Add the following line to your Emacs initialization file:
+
+    ```emacs-lisp
+    (hyperbole-mode 1)
+    ```
+
+    When Hyperbole is active, you will see `Hypb` in the minor-mode section of your modeline, and a **Hyperbole** menu will appear in the menubar.
+
+    You can also activate it interactively for the current session without editing your init file:
+
+    ```emacs-lisp
+    M-x hyperbole-mode RET
+    ```
+
+    To deactivate it:
+
+    ```emacs-lisp
+    (hyperbole-mode -1)
+    ```
+  </Accordion>
+
+  <Accordion title="How do I check the installed version?">
+    From inside Emacs, use either of these methods:
+
+    - Press `C-h h d v` to display the version via the Hyperbole menu.
+    - Evaluate the following expression with `M-: (hyperb:version) RET`:
+
+    ```emacs-lisp
+    (hyperb:version)
+    ```
+
+    The current development version is `9.0.2pre`.
+  </Accordion>
+</AccordionGroup>
+
+## Usage
+
+<AccordionGroup>
+  <Accordion title="How is Hyperbole different from Org mode?">
+    Org mode is a major mode — its features only work in `.org` files. Hyperbole is a global minor mode that works in **every buffer regardless of major mode**. If you open `eshell` and run `ls`, you can press `M-RET` on any filename and jump to it. The same Action Key works in source code, mail messages, man pages, Dired, Info, and more.
+
+    Hyperbole and Org mode are designed to **complement each other**, not compete. All Hyperbole functionality works within Org files, and Org links are recognized as implicit buttons by Hyperbole. The [Hyperbole wiki page](https://www.emacswiki.org/emacs/Hyperbole) describes the differences in detail.
+
+    <Tip>
+    Watch the EmacsConf talk [Powerful Productivity with Hyperbole and Org Mode](https://emacsconf.org/2022/talks/hyperorg/) for a practical demonstration of using both together.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="What is the Action Key?">
+    The Action Key is bound to `M-RET` by default. It is a **context-sensitive key** that automatically determines the most useful action based on what point is on. In a single session you might use it to:
+
+    - Follow a URL in any buffer
+    - Jump to a source line from a compiler error or grep output
+    - Activate an explicit or implicit Hyperbole button
+    - Follow an Org link or cycle an Org heading
+    - Navigate Info manual cross-references
+    - Jump to identifier definitions in source code
+    - Control windows and frames
+
+    There is also an Assist Key (`M-<mouse-2>` or the secondary smart key) that provides complementary or help-oriented actions in the same contexts.
+
+    You press one key and the right thing happens — no need to remember separate commands for each situation.
+  </Accordion>
+
+  <Accordion title="How do I see what the Action Key will do before pressing it?">
+    Press `C-u M-RET` (that is, the Action Key with a universal prefix argument). This displays a description of what the Action Key will do in the current context **without activating it**.
+
+    This is useful when you receive a file or message with embedded buttons and want to confirm their behavior before following them.
+  </Accordion>
+
+  <Accordion title="How do I create a hyperbutton?">
+    There are two main ways to create an explicit button:
+
+    **With the mouse:** With `hyperbole-mode` active, hold down the mouse button and drag from the source location (where you want the button to appear) to the destination location (the target, in another window). Release the mouse button and Hyperbole creates the link.
+
+    **From the keyboard:** Use the button creation command from the Hyperbole menu:
+
+    ```
+    C-h h b c
+    ```
+
+    This prompts you for the button name and link destination interactively.
+
+    Implicit buttons require no creation at all — Hyperbole automatically recognizes dozens of patterns (URLs, file paths, grep output, git commits, bug numbers, etc.) and activates them with `M-RET`.
+  </Accordion>
+
+  <Accordion title="How do I use Hyperbole with Org mode?">
+    Hyperbole and Org mode work together by default. When point is on an Org link or heading, `M-RET` delegates to Org's standard behavior (following links and cycling headings).
+
+    To control how the Action Key handles Org buffers, customize the variable `hsys-org-enable-smart-keys` in your init file:
+
+    ```emacs-lisp
+    ;; Use Hyperbole smart key behavior in Org buffers (default)
+    (setq hsys-org-enable-smart-keys t)
+
+    ;; Disable Hyperbole smart keys in Org buffers
+    (setq hsys-org-enable-smart-keys nil)
+    ```
+
+    With `hsys-org-enable-smart-keys` set to `t`, Hyperbole passes Org-context presses through to Org so both systems work seamlessly together.
+  </Accordion>
+
+  <Accordion title="Can I use Hyperbole on remote machines or from a terminal?">
+    Yes. The Hyperbole documentation notes:
+
+    > "Buttons may also be activated from a keyboard. In fact, virtually all Hyperbole operations, including menu usage, may be performed from any standard terminal interface, so one can use it on distant machines that provide limited display access."
+
+    All core features — button activation, HyRolo, the Koutliner, the minibuffer menu at `C-h h` — work entirely from the keyboard. Mouse drag operations for creating buttons are the only features that require a graphical display.
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Hyperbole conflicts with another package's M-RET binding">
+    If another package has already bound `M-RET` before Hyperbole loads, Hyperbole preserves that binding and will not overwrite it. You can rebind the Action Key to a different key in your init file **before** loading Hyperbole:
+
+    ```emacs-lisp
+    ;; Example: rebind Action Key to a custom key
+    (global-set-key (kbd "C-c RET") 'hkey-either)
+    ```
+
+    The variable `hmouse-middle-flag` in `hsettings.el` controls whether the middle mouse button is also bound as an Action Key. Set it to `nil` to disable the middle mouse binding:
+
+    ```emacs-lisp
+    (setq hmouse-middle-flag nil)
+    ```
+
+    You can also customize the Smart Key bindings through Hyperbole's customization group. The Hyperbole manual appendix "Questions and Answers" describes how to alter default context-sensitive key bindings in detail. Access it with `C-h h d i` and navigate to the Q&A section.
+  </Accordion>
+
+  <Accordion title="How do I report bugs?">
+    Send bug reports to the Hyperbole bug list:
+
+    **`bug-hyperbole@gnu.org`**
+
+    You can also browse the bug archive and subscribe at:
+    [http://lists.gnu.org/mailman/listinfo/bug-hyperbole](http://lists.gnu.org/mailman/listinfo/bug-hyperbole)
+
+    For general questions and discussion, use the user mailing list:
+
+    **`hyperbole-users@gnu.org`**
+
+    [info and subscription](http://lists.gnu.org/mailman/listinfo/hyperbole-users)
+
+    When reporting a bug, include your Emacs version (`M-x emacs-version RET`) and Hyperbole version (`C-h h d v`).
+  </Accordion>
+
+  <Accordion title="Where is the full documentation?">
+    The Hyperbole manual is included with the package in the `man/` subdirectory in four formats:
+
+    | Format | How to access |
+    |--------|---------------|
+    | Info (online browser) | `C-h h d i` from within Emacs |
+    | HTML | Open `~/.emacs.d/elpa/hyperbole-VERSION/man/hyperbole.html` in a browser |
+    | PDF | `~/.emacs.d/elpa/hyperbole-VERSION/man/hyperbole.pdf` |
+    | Texinfo source | `~/.emacs.d/elpa/hyperbole-VERSION/man/hyperbole.texi` |
+
+    The interactive demo at `C-h h d d` is the best way to explore Hyperbole's button capabilities hands-on. The Koutliner demo is at `C-h h k e`.
+
+    <Tip>
+    The `FAST-DEMO` file included with Hyperbole is the quickest way to learn about implicit buttons interactively after installation. Open it with `M-x find-file RET` and then use `M-RET` on items you see.
+    </Tip>
+  </Accordion>
+</AccordionGroup>

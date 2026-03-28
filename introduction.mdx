@@ -1,0 +1,86 @@
+---
+title: "Introduction"
+description: "GNU Hyperbole is an efficient and programmable hypertextual information management system implemented as a GNU Emacs package."
+---
+
+GNU Hyperbole (pronounced Ga-new Hi-per-bo-lee) is like Markdown for hypertext. It automatically recognizes dozens of common patterns in any buffer — regardless of mode — and activates them as hyperbuttons with a single key. Email addresses, URLs, grep output lines, git commits, programming backtraces, Org links, Info cross-references, and more all become instantly clickable. Load Hyperbole once and your text comes to life with no extra effort and no markup required.
+
+Hyperbole is a single global minor mode with no dependencies outside standard Emacs libraries. It works with GNU Emacs 28 or above. It is designed and written by Bob Weiner and maintained by him and Mats Lidell.
+
+## The six components
+
+Hyperbole consists of six integrated parts. The whole is greater than the sum: the components work together to form a unified information management environment.
+
+<CardGroup cols={2}>
+  <Card title="Buttons & Smart Keys" icon="computer-mouse" href="/concepts/buttons">
+    Context-sensitive hyperbuttons that can link to files, execute Lisp expressions, or perform any action. The Action Key (`M-RET`) and Assist Key (`C-u M-RET`) do the right thing in dozens of contexts without requiring you to learn a separate key for each operation. Create explicit link buttons by dragging between two windows — no markup needed.
+  </Card>
+  <Card title="HyWiki" icon="book" href="/features/hywiki">
+    A markup-free personal wiki system built on Org mode. WikiWords (capitalized words containing only letters) are automatically highlighted and turned into hyperlinks to their corresponding `.org` page files in your wiki directory — no delimiters or special syntax required.
+  </Card>
+  <Card title="Koutliner" icon="list-tree" href="/features/koutliner">
+    An advanced multi-level autonumbered outliner. Each outline node carries a relative autonumber (e.g., `1.4.8.6`) that renumbers automatically when you move nodes, plus a permanent hyperlink anchor you can reference from anywhere. View specifications can be embedded in links to control how the outline is displayed.
+  </Card>
+  <Card title="HyRolo" icon="address-book" href="/features/hyrolo">
+    A powerful hierarchical contact manager and fast full-text record search interface. Records are stored in plain text files. Search results can be expanded and collapsed for quick navigation. HyRolo can also manage any kind of hierarchical, record-oriented lookup task, not just contacts.
+  </Card>
+  <Card title="HyControl" icon="window-restore" href="/features/hycontrol">
+    The fastest window and frame manager available for GNU Emacs. With just a few keystrokes you can resize windows by lines, move frames by pixels, jump a frame to a screen corner, or zoom text in any window. Press `C-h h s w` to enter window control mode or `C-h h s f` for frame control.
+  </Card>
+  <Card title="Programming Library" icon="puzzle-piece" href="/api/overview">
+    A full Emacs Lisp API for system developers who want to integrate Hyperbole as a back-end or build new user interfaces on top of it. All of Hyperbole is written in Emacs Lisp and engineered for real-world usage. Define new implicit button types and action types with just a few lines of code.
+  </Card>
+</CardGroup>
+
+## What Hyperbole can do for you
+
+### Personal information management
+
+Overlapping link paths provide multiple views into an information space. A single key press activates any button regardless of its type — link, Lisp expression, or shell command — so navigation stays consistent everywhere. A search facility locates buttons in context for quick selection.
+
+### Documentation browsing
+
+Embed cross-references in any document format. Add point-and-click navigation to existing documentation without modifying its format. Link code and design documents, and jump to the definition of an identifier directly from its use in code or its mention in documentation.
+
+### Brainstorming
+
+Capture ideas and reorganize them rapidly with the Koutliner. Link to related ideas instead of copying and pasting, so your information stays in one authoritative place and links connect the concepts.
+
+### Hypertextual email and news
+
+Embed Hyperbole buttons in email messages. Recipients who also use Hyperbole can activate the buttons directly from their mail reader. Hyperlinks can include Emacs Lisp variables so they resolve correctly at different sites.
+
+### Help and training systems
+
+Create interactive tutorials with embedded buttons that demonstrate concepts hands-on, for example walking a reader through shell commands by letting them press a key to execute each step.
+
+## How buttons work
+
+There are three categories of Hyperbole buttons:
+
+- **Explicit buttons** — manually created and embedded in a document, visible as `<(button label)>`. Created by dragging between windows or via the `C-h h e` menu.
+- **Global buttons** — explicit or named implicit buttons stored in your personal button file (`C-h h b p`). Accessible by name from anywhere without the file being on screen.
+- **Implicit buttons** — patterns that Hyperbole recognizes automatically in any buffer: URLs, file paths, grep output lines, git commit hashes, Info references, Org links, key sequences in braces, and many more. No creation step required.
+
+Press `M-RET` (the Action Key) on any of these to activate it. Press `C-u M-RET` (or `C-h A`) first to preview what it will do before committing.
+
+## Relationship to Org mode
+
+Hyperbole and Org mode are complementary, not competing. Hyperbole works across **all** Emacs modes, while Org mode operates only within Org files. This means all Hyperbole functionality — including implicit button recognition — is available inside Org files as well. HyWiki, Hyperbole's wiki system, uses Org mode for its note files. Use both together.
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Hyperbole via GNU Elpa, the development snapshot, or from the Git repository.
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Learn the three essential keys and run the interactive demo in under five minutes.
+  </Card>
+  <Card title="Buttons & Smart Keys" icon="computer-mouse" href="/concepts/buttons">
+    Understand the core abstraction: how buttons work and what Smart Keys do.
+  </Card>
+  <Card title="Developer Guide" icon="code" href="/api/overview">
+    Extend Hyperbole with your own button types and action types using Emacs Lisp.
+  </Card>
+</CardGroup>

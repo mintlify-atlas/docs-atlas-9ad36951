@@ -1,0 +1,217 @@
+---
+title: "HyRolo"
+description: "Hierarchical, multi-file contact and record management system with fast full-text search, expand/collapse results, and support for Org, Markdown, BBDB, and more."
+---
+
+HyRolo is Hyperbole's record management system. It is built for fast, full-text retrieval of hierarchical, record-oriented information stored across multiple files. While most often used for contact management, HyRolo adapts readily to any record-based lookup task: personal notes, project references, research archives, and so on.
+
+Records are stored in plain text files using `*`-prefixed headings (like Org or Emacs Outline mode headlines), so they remain readable and portable outside Emacs.
+
+## Supported file formats
+
+HyRolo searches across several file types in a single query:
+
+| Format | Suffix | Notes |
+|---|---|---|
+| Org mode | `.org` | Full headline hierarchy with `*`, `**`, `***`, etc. |
+| Emacs Outline | `.otl` | Star-prefixed headings |
+| Markdown | `.md`, `.markdown` | Headlines starting with `#` (modern standard only, not setext underline style) |
+| Koutline | `.kotl` | Hyperbole's own outliner format |
+| BBDB | — | Via `bbdb` package, if installed |
+| Google Contacts | — | Via `google-contacts` package, if installed |
+
+<Note>
+For Markdown files, HyRolo supports only headlines that begin with `#` characters. The older setext style (underlining with `=` or `-`) is not supported.
+</Note>
+
+## Configuring which files to search
+
+The variable `hyrolo-file-list` specifies which files HyRolo searches. By default it points to `~/.rolo.org` (or `~/.rolo.otl` if the `.org` file is not readable):
+
+```emacs-lisp
+(setq hyrolo-file-list
+      '("~/.rolo.org"
+        "~/contacts/work.org"
+        "~/notes/projects.md"))
+```
+
+The first file in the list is where new entries are added by default. Additional files may use any of the supported suffixes.
+
+Customize it permanently with:
+
+```emacs-lisp
+M-x customize-variable RET hyrolo-file-list RET
+```
+
+## Accessing HyRolo
+
+<Tabs>
+  <Tab title="Keyboard">
+    Press `C-h h r` to open the HyRolo menu from the Hyperbole minibuffer menu. Select an action by typing its first letter.
+  </Tab>
+  <Tab title="Menubar">
+    Click **Hyperbole** → **Rolo** in the Emacs menubar.
+  </Tab>
+  <Tab title="Direct command">
+    Call any `hyrolo-*` command directly with `M-x`.
+  </Tab>
+</Tabs>
+
+## Searching records
+
+HyRolo provides two primary search functions:
+
+### Fixed-string search
+
+```emacs-lisp
+M-x hyrolo-fgrep RET
+```
+
+Searches all files in `hyrolo-file-list` for records containing the given string (case-insensitive, no regular expression). Results are displayed in the `*HyRolo*` buffer with expand/collapse support.
+
+### Regular expression search
+
+```emacs-lisp
+M-x hyrolo-grep RET
+```
+
+Searches for records matching a regular expression. Use this when you need pattern matching, e.g. phone numbers in a particular format.
+
+### Word search
+
+```emacs-lisp
+M-x hyrolo-word RET
+```
+
+Searches for records containing each word in the query string, in any order.
+
+### Interactive search (choose at runtime)
+
+```emacs-lisp
+M-x hyrolo-grep-or-fgrep RET
+```
+
+Prompts you to choose between fixed-string and regexp search at the time of the query.
+
+### Consult-based incremental search
+
+If `consult` is installed, use these for live-preview incremental searching:
+
+```emacs-lisp
+M-x hyrolo-consult-fgrep RET
+M-x hyrolo-consult-grep RET
+```
+
+## Search syntax for logical queries
+
+HyRolo supports logical combination of search terms using prefix notation:
+
+```text
+(and "Smith" "Chicago")
+(or  "Smith" "Jones")
+(xor "Smith" "Jones")
+(not "Smith")
+(r-and "Smith" "Chicago")   ;; each term is a regexp
+(r-or  "Smith" "Jones")     ;; each term is a regexp
+```
+
+Pass one of these strings as the search argument to `hyrolo-fgrep` or `hyrolo-grep`.
+
+## Adding, editing, and deleting records
+
+<Steps>
+  <Step title="Add a new entry">
+    ```emacs-lisp
+    M-x hyrolo-add RET
+    ```
+    Prompts for a name and the file to add it to (defaults to the first file in `hyrolo-file-list`). HyRolo inserts a new entry with a timestamp and places point inside it for editing.
+  </Step>
+  <Step title="Edit an existing entry">
+    ```emacs-lisp
+    M-x hyrolo-edit RET
+    ```
+    Search for an entry by name, then open it for editing in its source file.
+
+    From a `*HyRolo*` results buffer, press `e` (or use `M-x hyrolo-edit-entry RET`) to edit the entry at point directly in its source file.
+  </Step>
+  <Step title="Delete an entry">
+    ```emacs-lisp
+    M-x hyrolo-kill RET
+    ```
+    Prompts for the entry name and deletes it from the file.
+  </Step>
+</Steps>
+
+## The results buffer
+
+Search results are displayed in the `*HyRolo*` buffer. Each matching record is shown with its full context, including nested sub-entries. You can:
+
+- **Expand or collapse** entries with the Action Key (`M-RET`) or by pressing `TAB`
+- **Navigate** between matches with `M-x hyrolo-next-match RET`
+- **Edit** the entry at point with `e` or `M-x hyrolo-edit-entry RET`
+- **Yank** a record into a buffer with `M-x hyrolo-yank RET`
+
+## Sorting
+
+Sort the entries in a HyRolo file alphabetically:
+
+```emacs-lisp
+M-x hyrolo-sort RET
+```
+
+Prompts for the file to sort (defaults to the first file in `hyrolo-file-list`).
+
+## Org and Org Roam integration
+
+HyRolo can search Org and Org Roam files directly:
+
+```emacs-lisp
+M-x hyrolo-org RET       ;; Search Org files
+M-x hyrolo-org-roam RET  ;; Search Org Roam files
+```
+
+View Org tags across all HyRolo files with:
+
+```emacs-lisp
+M-x hyrolo-tags-view RET
+```
+
+## BBDB and Google Contacts
+
+If the `bbdb` or `google-contacts` packages are installed, HyRolo integrates with them automatically:
+
+```emacs-lisp
+M-x hyrolo-bbdb-fgrep RET           ;; Fixed-string search in BBDB
+M-x hyrolo-bbdb-grep RET            ;; Regexp search in BBDB
+M-x hyrolo-google-contacts-fgrep RET
+M-x hyrolo-google-contacts-grep RET
+```
+
+Set `hyrolo-google-contacts-flag` to `nil` to exclude Google Contacts from standard queries.
+
+## Key interactive commands
+
+| Command | Description |
+|---|---|
+| `hyrolo-fgrep` | Fixed-string search across all configured files |
+| `hyrolo-grep` | Regular expression search across all configured files |
+| `hyrolo-word` | Word search (all words must appear, any order) |
+| `hyrolo-grep-or-fgrep` | Choose search type at runtime |
+| `hyrolo-add` | Add a new record entry |
+| `hyrolo-edit` | Open an entry for editing by name |
+| `hyrolo-edit-entry` | Edit the entry at point in the results buffer |
+| `hyrolo-kill` | Delete an entry by name |
+| `hyrolo-sort` | Sort entries in a HyRolo file alphabetically |
+| `hyrolo-yank` | Insert a named entry at point |
+| `hyrolo-display-matches` | Re-display the last set of search results |
+| `hyrolo-next-match` | Move to the next match in the results buffer |
+| `hyrolo-toggle-datestamps` | Toggle automatic date stamping on entry creation/modification |
+| `hyrolo-tags-view` | Browse Org tags across HyRolo files |
+
+## Key variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `hyrolo-file-list` | `("~/.rolo.org")` | Files HyRolo searches and writes to |
+| `hyrolo-display-buffer` | `*HyRolo*` | Buffer used to display search results |
+| `hyrolo-google-contacts-flag` | `t` | Include Google Contacts in queries when the package is available |

@@ -1,0 +1,458 @@
+---
+title: "Button API"
+description: "Core Elisp functions for creating, retrieving, activating, and deleting Hyperbole buttons of all kinds."
+---
+
+The button API is defined primarily in `hbut.el`. Hyperbole recognizes three categories of buttons:
+
+- **Explicit buttons (ebut)** — created manually; their labels are delimited by `<(` and `)>` in the buffer text and their attributes are stored in a per-directory `.hypb` file.
+- **Implicit buttons (ibut)** — recognized automatically by type-matching rules at the point; no storage is required.
+- **Global buttons (gbut)** — explicit buttons stored in a single user-level file, activated by label name from any buffer.
+
+The abstract `hbut` class provides functions that work across all button types.
+
+## Button label constraints
+
+```emacs-lisp
+(defconst hbut:max-len 200
+  "Maximum length of a Hyperbole button label.")
+```
+
+Button labels are capped at **200 characters** by default. The value `0` disables the cap entirely (labels can extend to end-of-buffer). To read the effective limit, call `(hbut:max-len)`, which returns `(point-max)` when the constant is zero.
+
+<Note>
+Labels that span multiple lines have fill-prefix characters (comment markers, `>` quoting, etc.) stripped before storage. See `hbut:fill-prefix-regexps` for the recognized patterns.
+</Note>
+
+## Button symbol and attributes
+
+All retrieved buttons are represented as Elisp symbol objects. The canonical in-memory button is `hbut:current`, whose attributes are updated whenever a button is found at point. Attributes are stored on symbol property lists and accessed via the `hattr` family.
+
+### hattr functions
+
+| Function | Description |
+|---|---|
+| `(hattr:get obj-symbol attr-symbol)` | Return the value of an attribute on a button symbol |
+| `(hattr:set obj-symbol attr-symbol value)` | Set an attribute on a button symbol |
+| `(hattr:list obj)` | Return the full attribute property list for a button or Emacs button |
+| `(hattr:clear hbut)` | Remove all attributes from a button symbol |
+| `(hattr:copy from-hbut to-hbut)` | Copy all attributes from one button symbol to another |
+
+Standard attributes on a button symbol include:
+
+| Attribute | Description |
+|---|---|
+| `lbl-key` | Normalized label key (spaces replaced with `_`) |
+| `loc` | File path or buffer where the button lives |
+| `dir` | Directory of the button's source |
+| `actype` | The action type symbol (e.g., `actypes::link-to-file`) |
+| `action` | Optional action override that takes precedence over `actype` |
+| `args` | List of arguments to pass to the action type |
+| `categ` | Category: `explicit`, `implicit`, or an ibtype symbol |
+| `creator` | User who created the button |
+| `create-time` | Timestamp of creation |
+| `modifier` | User who last modified the button |
+| `mod-time` | Timestamp of last modification |
+
+## hbut — abstract button class
+
+These functions work on both explicit and implicit buttons.
+
+### hbut:at-p
+
+```emacs-lisp
+(defun hbut:at-p ())
+```
+
+Return the symbol for the explicit or implicit Hyperbole button at point, or `nil`. When called interactively, also display help for the button. Use `(hbut:act)` to activate the returned button.
+
+```emacs-lisp
+(when (hbut:at-p)
+  (hbut:act))
+```
+
+### hbut:get
+
+```emacs-lisp
+(defun hbut:get (&optional lbl-key buffer key-src))
+```
+
+Return the button symbol for the button given by `lbl-key` and `buffer`, or `nil` if not found. When called with no arguments, return the button at point. Searches both explicit and named implicit buttons.
+
+<ParamField path="lbl-key" type="string" optional>
+  The normalized label key. Convert a human-readable label with `(hbut:label-to-key label)`.
+</ParamField>
+<ParamField path="buffer" type="buffer or string" optional>
+  The buffer or buffer name to search. Defaults to the current buffer.
+</ParamField>
+<ParamField path="key-src" type="string" optional>
+  Full pathname; used when retrieving global buttons.
+</ParamField>
+
+### hbut:act
+
+```emacs-lisp
+(defun hbut:act (&optional hbut))
+```
+
+Perform the action for the explicit or implicit button symbol `hbut`. Defaults to `hbut:current`. Runs `action-act-hook` before performing the action.
+
+```emacs-lisp
+;; Activate any button at point
+(hbut:act)
+
+;; Activate a retrieved button
+(let ((but (hbut:get (hbut:label-to-key "My Button"))))
+  (when but (hbut:act but)))
+```
+
+### hbut:act-label
+
+```emacs-lisp
+(defun hbut:act-label (label))
+```
+
+Activate the implicit button with `<[label]>` from the current buffer. Signals an error when no matching button is found.
+
+### hbut:label
+
+```emacs-lisp
+(defun hbut:label (hbut))
+```
+
+Return the display label string for button symbol `hbut`. Converts the internal normalized key back to a human-readable label.
+
+### hbut:actype
+
+```emacs-lisp
+(defun hbut:actype (hbut))
+```
+
+Return the action type symbol for button symbol `hbut`. Returns `nil` when `hbut` is not a valid button.
+
+### hbut:label-to-key / hbut:key-to-label
+
+```emacs-lisp
+(defun hbut:label-to-key (label))
+(defun hbut:key-to-label (lbl-key))
+```
+
+Convert between a human-readable label string and its normalized key form. The key form replaces spaces with `_`, double underscores for literal underscores, and strips leading/trailing whitespace.
+
+```emacs-lisp
+(hbut:label-to-key "My Button")  ; => "My_Button"
+(hbut:key-to-label "My_Button")  ; => "My Button"
+```
+
+### hbut:is-p
+
+```emacs-lisp
+(defun hbut:is-p (object))
+```
+
+Return the symbol if `object` is a symbol representing any kind of Hyperbole button, else `nil`.
+
+### hbut:delete
+
+```emacs-lisp
+(defun hbut:delete (&optional lbl-key buffer key-src))
+```
+
+Delete the explicit or named implicit button given by `lbl-key` and `buffer`. When called with no arguments, delete the button at point.
+
+### hbut:list
+
+```emacs-lisp
+(defun hbut:list (&optional file loc-p))
+```
+
+Return a list of button labels from `file` or the current buffer. With `loc-p`, return `(label start end)` triples instead of bare labels.
+
+### hbut:map
+
+```emacs-lisp
+(defun hbut:map (but-func &optional regexp-match include-delims))
+```
+
+Apply `but-func` to all buttons (both ebuts and named ibuts) in the visible portion of the current buffer. `but-func` receives three arguments: `label`, `start`, `end`.
+
+## ebut — explicit button class
+
+### ebut:at-p
+
+```emacs-lisp
+(defun ebut:at-p (&optional start-delim end-delim))
+```
+
+Return the explicit Hyperbole button at point, or `nil`. Assumes point is within the first line of the button label. Optional `start-delim` and `end-delim` override the default `<(` / `)>` delimiters.
+
+### ebut:get
+
+```emacs-lisp
+(defun ebut:get (&optional lbl-key buffer key-src start-delim end-delim))
+```
+
+Return the explicit button symbol for the button at point (when no arguments are given) or the button identified by `lbl-key` and `buffer`. Populates `hbut:current` with the button's attributes and returns `'hbut:current`, or `nil` when not found.
+
+### ebut:create
+
+```emacs-lisp
+(defun ebut:create (&optional but-sym))
+```
+
+Create an explicit button based on the attributes already set on `but-sym` (defaults to `hbut:current`). Before calling, set at minimum `lbl-key`, `loc`, `dir`, and `actype` on the symbol using `hattr:set`. Returns an instance number string (or `t` for the first instance) on success, `nil` on failure.
+
+<Note>
+For programmatic creation from Lisp without manually setting attributes, prefer `ebut:program` instead.
+</Note>
+
+### ebut:program
+
+```emacs-lisp
+(defun ebut:program (label actype &rest args))
+```
+
+The recommended way to create an explicit button programmatically. Inserts `label` text at point surrounded by `<(` `)>` delimiters, registers the button in the data file, and returns any instance suffix appended to the label.
+
+<ParamField path="label" type="string">
+  Human-readable label text to insert at point.
+</ParamField>
+<ParamField path="actype" type="symbol or function">
+  A Hyperbole action type name (from `defact`) or an Emacs Lisp function symbol.
+</ParamField>
+<ParamField path="args" type="list">
+  Arguments to pass to `actype` when the button is activated. The label itself is provided automatically as the first argument.
+</ParamField>
+
+```emacs-lisp
+;; Create a button that links to a file
+(ebut:program "Hyperbole source" 'link-to-file
+              "/path/to/hyperbole/hbut.el")
+
+;; Create a button that evaluates an expression
+(ebut:program "Show version" 'eval-elisp
+              '(message "Hyperbole %s" hyperb:version))
+```
+
+### ebut:delete
+
+```emacs-lisp
+(defun ebut:delete (&optional but-sym))
+```
+
+Delete the explicit button given by `but-sym` (defaults to `hbut:current`). Returns the deleted attribute list on success, `nil` otherwise. Runs `ebut-delete-hook` after deletion.
+
+### ebut:act
+
+```emacs-lisp
+(defun ebut:act (&optional ebut))
+```
+
+Activate the explicit button `ebut` (defaults to `hbut:current`). Signals an error if `ebut` is not an explicit button symbol.
+
+### ebut:act-label
+
+```emacs-lisp
+(defun ebut:act-label (label))
+```
+
+Activate the explicit button with the given `label` in the current buffer. Signals an error if not found.
+
+### ebut:list
+
+```emacs-lisp
+(defun ebut:list (&optional file loc-p))
+```
+
+Return a list of explicit button labels from `file` or the current buffer. With `loc-p`, returns `(label start end)` triples.
+
+### ebut:map
+
+```emacs-lisp
+(defun ebut:map (but-func &optional regexp-match include-delims))
+```
+
+Apply `but-func` to all explicit buttons in the visible portion of the current buffer. `but-func` receives `(label start end)`.
+
+### ebut:next-occurrence
+
+```emacs-lisp
+(defun ebut:next-occurrence (lbl-key &optional buffer))
+```
+
+Move point to the next occurrence of the explicit button with `lbl-key` in `buffer` (defaults to current buffer). Call `(goto-char (point-min))` before this function to start from the beginning.
+
+### ebut:is-p
+
+```emacs-lisp
+(defun ebut:is-p (object))
+```
+
+Return non-nil if `object` is a symbol representing an explicit button (i.e., its `categ` attribute is `explicit`).
+
+### ebut:label-p
+
+```emacs-lisp
+(defun ebut:label-p (&optional as-label start-delim end-delim pos-flag two-lines-flag))
+```
+
+Return the normalized key for the explicit button label that point is within, or `nil`. With `as-label`, return the display label instead of the key. With `pos-flag`, return `(key-or-label start end)`.
+
+## gbut — global button class
+
+Global buttons are stored in a single file (`hbmap:filename` in `hbmap:dir-user`) and can be activated by label name from any buffer.
+
+### gbut:get
+
+```emacs-lisp
+(defun gbut:get (&optional lbl-key))
+```
+
+Return the global button symbol for `lbl-key`, or the button at point in the global button file when `lbl-key` is omitted. Returns `nil` if not found.
+
+### gbut:act
+
+```emacs-lisp
+(defun gbut:act (label))
+```
+
+Activate the global button with `label`. Signals an error when no matching button exists.
+
+### gbut:ebut-program
+
+```emacs-lisp
+(defun gbut:ebut-program (label actype &rest args))
+```
+
+Programmatically create a global explicit button. Appends the button to the end of the global button file. Same signature as `ebut:program`.
+
+```emacs-lisp
+;; Create a global button accessible by name from anywhere
+(gbut:ebut-program "Home dir" 'link-to-directory "~/")
+```
+
+### gbut:delete
+
+```emacs-lisp
+(defun gbut:delete (&optional lbl-key))
+```
+
+Delete the global button identified by `lbl-key`, or the button at point in the global button file. Returns the deleted attribute list, or `nil`.
+
+### gbut:file
+
+```emacs-lisp
+(defun gbut:file ())
+```
+
+Return the absolute path to the global button file.
+
+### gbut:label-list
+
+```emacs-lisp
+(defun gbut:label-list ())
+```
+
+Return the list of all global button labels as strings.
+
+## ibut — implicit button class
+
+Implicit buttons are not stored anywhere; they are recognized on-the-fly by matching rules (ibtypes) applied to the text at point.
+
+### ibut:at-p
+
+```emacs-lisp
+(defun ibut:at-p (&optional name-key-only))
+```
+
+Return the symbol `hbut:current` if an implicit button is recognized at point, else `nil`. Point may be on the button text or on its optional preceding `<[name]>` label. With `name-key-only`, return only the key for the button's name label.
+
+```emacs-lisp
+(when (ibut:at-p)
+  (hbut:act))
+```
+
+### ibut:at-type-p
+
+```emacs-lisp
+(defun ibut:at-type-p (ibut-type-symbol))
+```
+
+Return non-nil if there is an implicit button of type `ibut-type-symbol` at point. The return value is a list of the type's action type symbol and its arguments.
+
+```emacs-lisp
+(ibut:at-type-p 'pathname)  ; non-nil when on a file path
+```
+
+### ibut:is-p
+
+```emacs-lisp
+(defun ibut:is-p (object))
+```
+
+Return non-nil if `object` is a symbol representing an implicit button (its `categ` attribute is `implicit` or an ibtype symbol).
+
+### ibut:label-set
+
+```emacs-lisp
+(defun ibut:label-set (label &optional start end))
+```
+
+Set the label and optional buffer region `(start end)` for the implicit button being recognized. This function **must be called** from within a `defib` body to register the match. Without it, the ibtype framework will not recognize the button.
+
+### ibut:label-p
+
+```emacs-lisp
+(defun ibut:label-p (&optional as-label start-delim end-delim pos-flag two-lines-flag))
+```
+
+Return the key for the named implicit button label (`<[...]>`) that point is within, or `nil`. With `as-label`, return the display label string.
+
+## Usage examples
+
+<AccordionGroup>
+  <Accordion title="Create and activate an explicit button in a buffer">
+    ```emacs-lisp
+    ;; Open a scratch buffer and create a button
+    (with-current-buffer (get-buffer-create "*my-scratch*")
+      (erase-buffer)
+      (insert "Press the button below:\n\n")
+      ;; ebut:program inserts the button label and registers it
+      (ebut:program "Visit GNU" 'www-url "https://www.gnu.org")
+      (pop-to-buffer (current-buffer)))
+    ```
+  </Accordion>
+  <Accordion title="Iterate all explicit buttons in a file">
+    ```emacs-lisp
+    ;; Collect all explicit button labels from a file
+    (ebut:list "/path/to/file.org")
+    ;; => ("Button One" "Button Two" ...)
+
+    ;; Map over buttons to get positions
+    (with-current-buffer (find-file-noselect "/path/to/file.org")
+      (ebut:map (lambda (label start end)
+                  (message "Button %S at %d-%d" label start end))))
+    ```
+  </Accordion>
+  <Accordion title="Search for a button and act on it">
+    ```emacs-lisp
+    ;; Find a specific button by label and activate it
+    (let* ((key (hbut:label-to-key "Visit GNU"))
+           (but (ebut:get key)))
+      (if but
+          (hbut:act but)
+        (message "Button not found")))
+    ```
+  </Accordion>
+  <Accordion title="Inspect button attributes">
+    ```emacs-lisp
+    ;; After finding a button at point
+    (when (hbut:at-p)
+      (let ((but 'hbut:current))
+        (message "Label:  %s" (hbut:label but))
+        (message "Actype: %s" (hbut:actype but))
+        (message "Args:   %S" (hattr:get but 'args))
+        (message "Loc:    %s" (hattr:get but 'loc))))
+    ```
+  </Accordion>
+</AccordionGroup>

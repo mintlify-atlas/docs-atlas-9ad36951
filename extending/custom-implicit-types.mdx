@@ -1,0 +1,286 @@
+---
+title: "Custom Implicit Button Types"
+description: "Define new implicit button types with defib to recognize patterns in buffer text and act on them when the Smart Keys are pressed."
+---
+
+Implicit buttons require no explicit markup. Hyperbole scans the text around point through a prioritized list of _implicit button types_ (ibtypes) each time the Action Key or Assist Key is pressed. The first type whose predicate matches takes effect. The `defib` macro lets you add your own pattern matchers to this pipeline.
+
+## The `defib` macro
+
+`defib` is defined in `hbut.el`.
+
+```emacs-lisp
+(defib NAME _PARAMS DOC AT-P &optional TO-P STYLE)
+```
+
+| Parameter | Description |
+|-----------|-------------|
+| `NAME`    | Unquoted symbol — becomes `ibtypes::NAME` internally |
+| `_PARAMS` | Parameter list — currently ignored; use `()` |
+| `DOC`     | Required documentation string |
+| `AT-P`    | Body form — return non-nil when point is on this button type. **Must call `ibut:label-set`** and usually ends with `(hact ...)` |
+| `TO-P`    | Optional — moves point to the next button of this type; returns `(label start end)` or nil |
+| `STYLE`   | Optional — display style for button highlighting when `TO-P` is given |
+
+<Warning>
+Every `AT-P` form **must** call `ibut:label-set` before returning non-nil. Failing to do so raises an error at definition time: `"(defib): 'at-p' argument for TYPE must include a call to 'ibut:label-set'"`.
+</Warning>
+
+### The AT-P contract
+
+`AT-P` is the heart of an ibtype. It is evaluated with point at its current position every time Hyperbole checks whether this type applies. It must:
+
+1. Detect whether point is within a region that matches this type's pattern.
+2. If yes, call `ibut:label-set` to record the button's label text and its start/end buffer positions.
+3. Call `(hact 'some-action-type arg ...)` to register what will happen when the button is activated.
+4. Return the non-nil result of `hact` (which is the return value of the action, coerced to `t` if nil).
+
+If the pattern does not match, `AT-P` must return `nil`.
+
+### Priority and ordering
+
+ibtypes are tested in reverse definition order — the **last** type defined has the **highest** priority. Types loaded from `hibtypes.el` are at the bottom of the priority stack; your new types, loaded after, sit on top of them.
+
+```emacs-lisp
+;; Evaluate to see the current priority order (highest priority first):
+(symset:get 'ibtypes 'symbols)
+
+;; To delete an ibtype:
+(ibtype:delete 'my-old-type)
+```
+
+<Note>
+`ibtype:delete` calls `htype:delete` on the `ibtypes` category. It unbinds the symbol, removes it from the symtable and symset, and runs `htype-delete-hook`.
+</Note>
+
+## Real examples
+
+### `kbd-key` — key sequences in braces (from `hib-kbd.el`)
+
+This is the ibtype that recognizes key series such as `{C-x C-b}` and executes them on Action Key press.
+
+```emacs-lisp
+(defib kbd-key ()
+  "Execute a key series (series of key sequences) around point.
+The key series is delimited by curly braces, {}.  Key sequences
+should be in human readable form, e.g. {C-x C-b}, or what
+`key-description' returns."
+  (unless (or (br-in-browser)
+              (and (looking-at "[{}]") (/= ?\\ (preceding-char))))
+    (with-syntax-table text-mode-syntax-table
+      (let* ((hbut:max-len (max 3000 (hbut:max-len)))
+             (seq-and-pos (or
+                           (hbut:label-p t "{`" "'}" t)
+                           (hbut:label-p t "{" "}" t)
+                           (hbut:label-p t "``" "''" t)
+                           (hbut:label-p t "'" "'" t)))
+             (key-series (car seq-and-pos))
+             (start (cadr seq-and-pos))
+             binding)
+        (when (or (memq (char-before start) '(nil ?\ ?\t ?\n ?\r ?\f ?\"))
+                  (and (derived-mode-p 'texinfo-mode)
+                       (= (if (char-before start)
+                              (char-syntax (char-before start))
+                            0)
+                          ?w)))
+          (when (and (stringp key-series) (not (string-empty-p key-series)))
+            (let ((hpath:variable-regexp "\\${\\([^}]+\\)}"))
+              (setq key-series (hpath:substitute-value key-series)))
+            (setq key-series (kbd-key:normalize key-series)
+                  binding (kbd-key:binding key-series)))
+          (and (stringp key-series)
+               (or (and binding (not (integerp binding)))
+                   (kbd-key:special-sequence-p key-series))
+               (ibut:label-set seq-and-pos)
+               (hact 'kbd-key key-series)))))))
+```
+
+Key points:
+- `hbut:label-p` is a helper that scans for text between delimiter pairs and returns `(text start end)` or nil.
+- `ibut:label-set` accepts either the `(text start end)` list returned by `hbut:label-p` (via `apply`) or individual arguments.
+- The Assist Key behavior for `kbd-key` is defined in a separate `kbd-key:help` function, registered via the ibtype's `help` property.
+
+### `mail-address` — compose mail to an address at point (from `hibtypes.el`)
+
+```emacs-lisp
+(defib mail-address ()
+  "If on an e-mail address, compose mail to that address in another window."
+  (when (let ((case-fold-search t))
+          (or (and (or (null hypb:mail-address-mode-list)
+                       (apply #'derived-mode-p hypb:mail-address-mode-list))
+                   (not (string-match "-Elements\\'" (buffer-name))))
+              (string-match "mail\\|rolo" (buffer-name))
+              (when (boundp 'hyrolo-display-buffer)
+                (equal (buffer-name) hyrolo-display-buffer))))
+    (let ((address (mail-address-at-p)))
+      (when address
+        (ibut:label-set address (match-beginning 1) (match-end 1))
+        (hact 'link-to-compose-mail address)))))
+```
+
+This shows the two-level pattern: a mode/context guard (`when ...`) wraps a pattern detector (`mail-address-at-p`), and `ibut:label-set` receives the matched region directly.
+
+### `annot-bib` — annotated bibliography references (from `hibtypes.el`)
+
+```emacs-lisp
+(defib annot-bib ()
+  "Display annotated bibliography entries referenced internally.
+References must be delimited by square brackets, must begin with a word
+constituent character, not contain @ or # characters, must not be
+in buffers whose names begin with a space or asterisk character, must
+not be in a programming mode, Markdown or Org buffer."
+  (and (not (bolp))
+       (hypb:buffer-file-name)
+       (let ((chr (aref (buffer-name) 0)))
+         (not (or (eq chr ?\ ) (eq chr ?*))))
+       (not (apply #'derived-mode-p
+                   '(c++-mode c-mode java-mode markdown-mode org-mode prog-mode)))
+       (unless (ibut:label-p t "[[" "]]" t) ;; Org link
+         (let ((ref (hattr:get 'hbut:current 'lbl-key))
+               (lbl-start (hattr:get 'hbut:current 'lbl-start))
+               lbl-start-end)
+           (and ref
+                lbl-start
+                (eq ?w (char-syntax (aref ref 0)))
+                (not (string-match "[#@]" ref))
+                (save-excursion
+                  (goto-char lbl-start)
+                  (setq lbl-start-end (ibut:label-p t "[" "]" t)))
+                (apply #'ibut:label-set lbl-start-end)
+                (hact 'annot-bib ref))))))
+```
+
+This example uses `hbut:current`'s attributes (`lbl-key`, `lbl-start`) — Hyperbole pre-populates these for each candidate match before calling the ibtype's predicate body.
+
+## Step-by-step: a Wikipedia lookup type
+
+This walkthrough creates an ibtype that recognizes patterns like `[wp<Term>]` anywhere in a buffer and opens the Wikipedia article for `Term`.
+
+<Steps>
+  <Step title="Define a helper to detect the pattern">
+    Write a function that returns the Wikipedia term and its buffer positions when point is inside a `[wp<...>]` pattern, or nil otherwise.
+
+    ```emacs-lisp
+    (defun my-wp-term-at-p ()
+      "Return (TERM START END) if point is inside [wp<TERM>], else nil."
+      (save-excursion
+        (let ((limit (line-end-position)))
+          (when (re-search-backward "\\[wp<" (line-beginning-position) t)
+            (let ((start (match-beginning 0))
+                  (term-start (match-end 0)))
+              (when (re-search-forward ">\\]" limit t)
+                (list (buffer-substring-no-properties term-start (match-beginning 0))
+                      start
+                      (match-end 0))))))))
+    ```
+  </Step>
+
+  <Step title="Write the defib form">
+    ```emacs-lisp
+    (defib my-wikipedia ()
+      "When on a [wp<Term>] pattern, open the Wikipedia article for Term.
+    Assist Key press displays the URL that would be opened."
+      (let ((result (my-wp-term-at-p)))
+        (when result
+          (let ((term  (nth 0 result))
+                (start (nth 1 result))
+                (end   (nth 2 result)))
+            (ibut:label-set term start end)
+            (hact 'www-url
+                  (concat "https://en.wikipedia.org/wiki/"
+                          (url-hexify-string term)))))))
+    ```
+
+    The `www-url` action type opens a URL in the user's configured browser, so no extra browser-opening code is needed.
+  </Step>
+
+  <Step title="Load and verify">
+    Evaluate the helper and `defib` forms. Then confirm registration:
+
+    ```emacs-lisp
+    ;; Check that the type is now at the front of the priority list
+    (car (symset:get 'ibtypes 'symbols))
+    ;; => my-wikipedia
+    ```
+  </Step>
+
+  <Step title="Test it">
+    Open any buffer and insert:
+
+    ```
+    See also [wp<GNU Emacs>] and [wp<Lisp (programming language)>].
+    ```
+
+    Place point inside `[wp<GNU Emacs>]` and press the Action Key (`M-RET`). The Wikipedia article opens in your browser.
+
+    Press the Assist Key (`C-u M-RET`) to see button help, which displays the doc string from your `defib`.
+  </Step>
+
+  <Step title="Add an Assist Key handler (optional)">
+    The Assist Key help for ibtypes is looked up via a `NAME:help` function. Define one to customize the Assist Key behavior:
+
+    ```emacs-lisp
+    (defun my-wikipedia:help (hbut)
+      "Display the Wikipedia URL for the term in HBUT."
+      (let ((term (hbut:key-to-label (hattr:get hbut 'lbl-key))))
+        (message "Wikipedia URL: https://en.wikipedia.org/wiki/%s"
+                 (url-hexify-string term))))
+    ```
+
+    When the Assist Key is pressed on a `my-wikipedia` button, Hyperbole calls this function with the button object.
+  </Step>
+
+  <Step title="Remove when no longer needed">
+    ```emacs-lisp
+    (ibtype:delete 'my-wikipedia)
+    ```
+  </Step>
+</Steps>
+
+## Key helper functions
+
+| Function | Purpose |
+|----------|---------|
+| `ibut:label-set LABEL START END` | Record the label and its buffer region for the current button match |
+| `hbut:label-p STRICT START-DELIM END-DELIM &optional MATCH-PART-P` | Scan for text between delimiter strings; returns `(text start end)` or nil |
+| `hact ACTYPE &rest ARGS` | Invoke an action type and record the action on `hbut:current` |
+| `hattr:get 'hbut:current 'lbl-key` | Get the pre-set label key for the current button candidate |
+| `ibtypes:delete TYPE` | Remove an ibtype from the active type set |
+
+<AccordionGroup>
+  <Accordion title="Using assist-flag for dual-key behavior">
+    Inside an ibtype's `AT-P` body, the variable `assist-flag` is non-nil when the Assist Key was pressed instead of the Action Key. You can use this to branch behavior:
+
+    ```emacs-lisp
+    (defib my-type ()
+      "..."
+      (when (my-pattern-at-p)
+        (ibut:label-set ...)
+        (if assist-flag
+            (hact 'my-type:show-info ...)
+          (hact 'my-type:follow-link ...))))
+    ```
+  </Accordion>
+
+  <Accordion title="Using defil for simple delimiter-based types">
+    For the common case of recognizing text between a fixed pair of delimiters and constructing a link from that text, Hyperbole provides the higher-level `defil` macro (defined in `hbut.el`). It generates both the ibtype and its `TO-P` mover automatically.
+
+    ```emacs-lisp
+    (defil my-jira-link "PROJ-" "" "[A-Z]+-[0-9]+"
+           "https://jira.example.com/browse/\\&")
+    ```
+
+    This creates an ibtype named `my-jira-link` that matches things like `PROJ-1234` and opens the corresponding Jira issue.
+  </Accordion>
+
+  <Accordion title="Resetting ibtype priorities">
+    If you need to completely reset all ibtype priority ordering and reload:
+
+    ```emacs-lisp
+    (symset:clear 'ibtypes)
+    (load "hibtypes")
+    ```
+
+    After this, any types you defined in your init file will need to be re-evaluated to regain their position at the top of the priority stack.
+  </Accordion>
+</AccordionGroup>

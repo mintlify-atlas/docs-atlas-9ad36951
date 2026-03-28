@@ -1,0 +1,584 @@
+---
+title: "Built-in Button Types"
+description: "Reference for GNU Hyperbole's built-in action types (actypes), including file links, Info nodes, keyboard macros, Elisp evaluation, and more."
+---
+
+Hyperbole's action types (`actypes`) define what happens when an explicit button is activated. They are defined using `defact` in `hactypes.el` and `hsys-www.el`. When you create an explicit button with `hui:ebut-create` (or via the Button menu at `C-h h b`), you choose an action type and supply its arguments.
+
+To list all currently loaded action types, evaluate:
+
+```emacs-lisp
+(symset:get 'actypes 'symbols)
+```
+
+---
+
+## File and Directory Links
+
+<AccordionGroup>
+
+<Accordion title="link-to-file — Link to a file">
+
+**Defined in:** `hactypes.el`
+
+Displays a file given by `PATH`, scrolled to an optional `POINT` (a buffer position integer). If `POINT` is given, the buffer is displayed with that position at the top of the window.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `path` | string | Path to the file to display |
+| `point` | integer (optional) | Buffer position to scroll to at window top |
+
+**Example — button that opens a specific file:**
+
+```emacs-lisp
+<(My Config File)> [link-to-file "~/.emacs.d/init.el"]
+```
+
+**Example — button that opens a file at a saved position:**
+
+```emacs-lisp
+<(Release Notes Top)> [link-to-file "~/project/CHANGES" 1]
+```
+
+When creating this button type interactively, Hyperbole reads the file path and then asks: `y = Display at present position (line N); n = no position?`
+
+</Accordion>
+
+<Accordion title="link-to-file-line — Link to a file at a specific line">
+
+**Defined in:** `hactypes.el`
+
+Displays a file given by `PATH` scrolled to `LINE-NUM`. The line number may be an integer or a string.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `path` | string | Path to the file to display |
+| `line-num` | integer or string | Line number to jump to |
+
+**Example:**
+
+```emacs-lisp
+<(Error Handler)> [link-to-file-line "src/main.c" 42]
+```
+
+This action type is also used internally by Hyperbole when recognizing grep output, compilation error buffers, and similar line-referencing contexts.
+
+</Accordion>
+
+<Accordion title="link-to-file-line-and-column — Link to a file at a specific line and column">
+
+**Defined in:** `hactypes.el`
+
+Displays a file given by `PATH` scrolled to `LINE-NUM` with point positioned at `COL-NUM`.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `path` | string | Path to the file to display |
+| `line-num` | integer | Line number to jump to |
+| `col-num` | integer | Column number (0-based) to position point |
+
+**Example:**
+
+```emacs-lisp
+<(Specific Location)> [link-to-file-line-and-column "~/notes.org" 100 12]
+```
+
+</Accordion>
+
+<Accordion title="link-to-directory — Link to a directory in Dired">
+
+**Defined in:** `hactypes.el`
+
+Displays a directory in Dired mode.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `directory` | string | Path to the directory to display |
+
+**Example:**
+
+```emacs-lisp
+<(Project Source)> [link-to-directory "~/project/src/"]
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Pattern and String Search Links
+
+<AccordionGroup>
+
+<Accordion title="link-to-regexp-match — Link to a regexp match in a file">
+
+**Defined in:** `hactypes.el`
+
+Finds the Nth occurrence of `REGEXP` in `SOURCE` and displays the buffer with that location at the top of the window. `SOURCE` is a file pathname unless `BUFFER-P` is non-nil, in which case it must be a buffer name or buffer object.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `regexp` | string | Regular expression to search for |
+| `n` | integer | Occurrence number (1 = first match) |
+| `source` | string | File pathname (or buffer name if `buffer-p` is non-nil) |
+| `buffer-p` | boolean (optional) | Non-nil means `source` is a buffer, not a file |
+
+**Example — jump to the second occurrence of a function definition:**
+
+```emacs-lisp
+<(Second Defun)> [link-to-regexp-match "^(defun " 2 "~/project/utils.el"]
+```
+
+Returns `t` if found; signals an error if the pattern is not found.
+
+</Accordion>
+
+<Accordion title="link-to-string-match — Link to a string match in a file">
+
+**Defined in:** `hactypes.el`
+
+Finds the Nth occurrence of `STRING` (a literal string, not a regexp) in `SOURCE` and displays the location at the top of the window. Internally calls `link-to-regexp-match` with `regexp-quote` applied to the string.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `string` | string | Literal string to search for |
+| `n` | integer | Occurrence number (1 = first match) |
+| `source` | string | File pathname (or buffer name if `buffer-p` is non-nil) |
+| `buffer-p` | boolean (optional) | Non-nil means `source` is a buffer, not a file |
+
+**Example:**
+
+```emacs-lisp
+<(Find TODO)> [link-to-string-match "TODO: refactor this" 1 "~/project/main.py"]
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Buffer Links
+
+<AccordionGroup>
+
+<Accordion title="link-to-buffer-tmp — Temporary link to a live buffer">
+
+**Defined in:** `hactypes.el`
+
+Displays `BUFFER` (by name or buffer object) scrolled to an optional `POINT`. If `POINT` is given, the buffer is displayed with that position at the top of the window.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `buffer` | string or buffer | Buffer name or buffer object to display |
+| `point` | integer or marker (optional) | Position to scroll to at window top |
+
+**Example:**
+
+```emacs-lisp
+<(Messages)> [link-to-buffer-tmp "*Messages*"]
+```
+
+<Warning>
+This link type refers to a live buffer in the current Emacs session. It is not persistent across Emacs restarts. Use `link-to-file` for permanent links.
+</Warning>
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Info Manual Links
+
+<AccordionGroup>
+
+<Accordion title="link-to-Info-node — Link to an Info manual node">
+
+**Defined in:** `hactypes.el`
+
+Displays an Info node given by `STRING`. If the node is not found directly, Hyperbole attempts to display it as an Info index item.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `string` | string | Node reference in `(filename)nodename` or `filename.info#name` format |
+
+The filename may be given without the `.info` suffix when using the parenthesized format. During button creation, completion for both filename and node name is available.
+
+**Example — link to the Hyperbole manual:**
+
+```emacs-lisp
+<(Hyperbole Intro)> [link-to-Info-node "(hyperbole)Top"]
+```
+
+**Example — link to an Emacs Lisp node:**
+
+```emacs-lisp
+<(Emacs Hooks)> [link-to-Info-node "(elisp)Hooks"]
+```
+
+**Example — using the `.info#node` format:**
+
+```emacs-lisp
+<(Org Capture)> [link-to-Info-node "org.info#Capture"]
+```
+
+</Accordion>
+
+<Accordion title="link-to-Info-index-item — Link to an Info index entry">
+
+**Defined in:** `hactypes.el`
+
+Displays an Info index cross-reference. `INDEX-ITEM` must be a string of the form `(filename)item-name`. During button creation, completion for both filename and item name is available.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `index-item` | string | Index item reference in `(filename)item-name` format |
+
+**Example:**
+
+```emacs-lisp
+<(Org Agenda Views Index)> [link-to-Info-index-item "(org)agenda views"]
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Koutliner Links
+
+<AccordionGroup>
+
+<Accordion title="link-to-kcell — Link to a Koutliner cell">
+
+**Defined in:** `hactypes.el`
+
+Displays `FILE` with the Koutliner cell given by `CELL-REF` at the top of the window.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `file` | string or nil | Path to a `.kotl` file; if nil, uses current buffer or source location |
+| `cell-ref` | string | Cell reference; see `kcell:ref-to-id` for valid formats |
+
+Valid `cell-ref` formats include autonumbered cell IDs (e.g. `"1.2.3"`), permanent cell anchors, and relative references.
+
+**Example:**
+
+```emacs-lisp
+<(Project Plan Node)> [link-to-kcell "~/project/plan.kotl" "2.1"]
+```
+
+If `FILE` is nil and `CELL-REF` is nil, the first cell in the current Koutline view is shown.
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Keyboard Macro Execution
+
+<AccordionGroup>
+
+<Accordion title="exec-kbd-macro — Execute a keyboard macro">
+
+**Defined in:** `hactypes.el`
+
+Executes `KBD-MACRO` optionally `REPEAT-COUNT` times. `KBD-MACRO` may be a string of editor command characters, a function symbol bound to a keyboard macro, or `nil` to use the last defined keyboard macro. A repeat count of `0` means repeat until an error occurs.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `kbd-macro` | string, symbol, or nil | The macro to execute; nil uses `last-kbd-macro` |
+| `repeat-count` | integer (optional) | Number of times to execute; nil means once, 0 means until error |
+
+**Example — button that executes a named macro once:**
+
+```emacs-lisp
+<(Insert Header)> [exec-kbd-macro my-insert-header-macro 1]
+```
+
+**Example — button that executes the last keyboard macro 3 times:**
+
+```emacs-lisp
+<(Repeat Last Macro x3)> [exec-kbd-macro nil 3]
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Elisp Evaluation
+
+<AccordionGroup>
+
+<Accordion title="eval-elisp — Evaluate an Emacs Lisp expression">
+
+**Defined in:** `hactypes.el`
+
+Evaluates `LISP-EXPR` for its side-effects and returns its value. The expression is evaluated by `hypb:eval`.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `lisp-expr` | Lisp form | The expression to evaluate |
+
+**Example — button that toggles line numbers:**
+
+```emacs-lisp
+<(Toggle Line Numbers)> [eval-elisp (display-line-numbers-mode 'toggle)]
+```
+
+**Example — button that opens a specific URL:**
+
+```emacs-lisp
+<(Open Docs)> [eval-elisp (browse-url "https://www.gnu.org/software/hyperbole/")]
+```
+
+<Warning>
+Be cautious with buttons using `eval-elisp` in files shared with others, as the expression is executed without prompting when the Action Key is pressed.
+</Warning>
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Man Pages
+
+<AccordionGroup>
+
+<Accordion title="man-show — Display a man page">
+
+**Defined in:** `hactypes.el`
+
+Displays a Unix man page for `TOPIC`. The topic may be of the form `command(section)`, e.g. `"grep(1)"`. Uses `hpath:display-where` to determine where the man page buffer is displayed.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `topic` | string | Man page topic, optionally with section, e.g. `"ls"` or `"open(2)"` |
+
+**Example:**
+
+```emacs-lisp
+<(Grep Man Page)> [man-show "grep(1)"]
+```
+
+**Example — without section:**
+
+```emacs-lisp
+<(SSH Manual)> [man-show "ssh"]
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Web and URL Links
+
+<AccordionGroup>
+
+<Accordion title="www-url — Open a URL in a browser">
+
+**Defined in:** `hsys-www.el`
+
+Follows a hyperlink given by `URL` using the browser configured by `browse-url-browser-function`. If the URL has no scheme prefix, `https://` is prepended automatically.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `url` | string | The URL to open |
+
+**Example:**
+
+```emacs-lisp
+<(GNU Hyperbole Home)> [www-url "https://www.gnu.org/software/hyperbole/"]
+```
+
+**Example — scheme is added automatically:**
+
+```emacs-lisp
+<(Emacs Wiki)> [www-url "www.emacswiki.org"]
+```
+
+The browser used respects `browse-url-browser-function`. If that is set to `eww-browse-url`, Hyperbole substitutes its own `www-eww-browse-url` wrapper for consistent display behavior.
+
+</Accordion>
+
+<Accordion title="link-to-web-search — Perform a web search">
+
+**Defined in:** `hactypes.el`
+
+Searches web service `SERVICE-NAME` for `SEARCH-TERM` using `hyperbole-web-search-alist` to map the service name to a URL template, and `browse-url` to display results.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `service-name` | string | Name of the search service (must be in `hyperbole-web-search-alist`) |
+| `search-term` | string | The term to search for |
+
+**Example:**
+
+```emacs-lisp
+<(Search Wikipedia for Hyperbole)> [link-to-web-search "Wikipedia" "Hyperbole"]
+```
+
+Supported service names by default include: `Amazon`, `Bing`, `Dictionary`, `ducKduckgo`, `Elisp`, `Facebook`, `Google`, `gitHub`, `Images`, `Maps`, `RFCs`, `StackOverflow`, `Wikipedia`, `X`, and `Youtube`.
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Other Built-in Types
+
+<AccordionGroup>
+
+<Accordion title="link-to-bookmark — Link to an Emacs bookmark">
+
+**Defined in:** `hactypes.el`
+
+Jumps to an Emacs bookmark given by its name. When creating this button type in Bookmark Menu mode, the bookmark nearest point is used as the default. Otherwise, `bookmark-current-bookmark` is the default.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `bookmark` | string | The bookmark name to jump to |
+
+**Example:**
+
+```emacs-lisp
+<(Go to Project Root)> [link-to-bookmark "project-root"]
+```
+
+</Accordion>
+
+<Accordion title="annot-bib — Follow an annotated bibliography reference">
+
+**Defined in:** `hactypes.el`
+
+Follows an internal reference `KEY` within an annotated bibliography, where references are delimited by square brackets `[KEY]`. Searches backward from the end of the buffer for `[KEY]` and jumps to that location.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | string | The reference key without surrounding brackets |
+
+**Example — in an annotated bibliography file:**
+
+```emacs-lisp
+<(See Knuth1997)> [annot-bib "Knuth1997"]
+```
+
+</Accordion>
+
+<Accordion title="exec-shell-cmd — Execute a shell command">
+
+**Defined in:** `hactypes.el`
+
+Executes `SHELL-CMD` asynchronously in a shell buffer named `*Hyperbole Shell*`. Optionally suppresses display of the command itself and optionally kills prior shell output before executing.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `shell-cmd` | string | Shell command string to execute |
+| `internal-cmd` | boolean (optional) | Non-nil suppresses display of the command line |
+| `kill-prev` | boolean (optional) | Non-nil kills prior output before executing |
+
+**Example:**
+
+```emacs-lisp
+<(Run Tests)> [exec-shell-cmd "make test" nil nil]
+```
+
+</Accordion>
+
+<Accordion title="button-series — Combine multiple buttons into a series">
+
+**Defined in:** `hactypes.el`
+
+Activates a sequence of buttons given by their labels. Local (explicit or implicit) buttons are preferred over global buttons when labels match both.
+
+**Parameters:**
+
+| Parameter | Type | Description |
+|---|---|---|
+| `buts` | list of strings | List of button labels to activate in sequence |
+
+**Example:**
+
+```emacs-lisp
+<(Full Setup)> [button-series ("Open Config" "Open Notes" "Start Server")]
+```
+
+</Accordion>
+
+</AccordionGroup>
+
+---
+
+## Using Action Types When Creating Explicit Buttons
+
+When you create an explicit button with `M-x hui:ebut-create` or via `C-h h b c`, Hyperbole prompts:
+
+1. **Button label** — the text that appears between `<(` and `)>` delimiters in the buffer.
+2. **Action type** — selected from the list of available `actypes`.
+3. **Action arguments** — specific to the chosen type, read interactively.
+
+The resulting button is stored in the buffer's `.hypb` attribute file and displayed with a highlighted face.
+
+**Example: creating a `link-to-file-line` button interactively:**
+
+```
+C-h h b c RET
+Button label: My Function Definition
+Action type: link-to-file-line
+Path to link to: ~/project/src/core.py
+Display at line number: 87
+```
+
+This inserts `<(My Function Definition)>` at point and stores the button attributes in `.hypb`.
+
+To see all available action types in a completion buffer:
+
+```emacs-lisp
+M-x hui:ebut-create RET RET    ;; then TAB at the action type prompt
+```

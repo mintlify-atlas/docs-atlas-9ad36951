@@ -1,0 +1,224 @@
+---
+title: "Org Mode Integration"
+description: "How GNU Hyperbole and Org mode work together — Smart Key behavior, Org link support, HyWiki, Org Roam, and HyNote integration."
+---
+
+Hyperbole and Org mode are **complementary**, not competing. Org mode excels at structured documents, task management, and agenda views. Hyperbole adds a universal activation layer across every buffer — including Org buffers — so you can follow links, activate buttons, and navigate with a single key regardless of context.
+
+Hyperbole ships `hsys-org.el`, which wires the Smart Keys into Org mode buffers without replacing Org's own keybindings unless you explicitly ask it to.
+
+## Smart Key behavior in Org buffers
+
+The `hsys-org-enable-smart-keys` customizable variable controls how Hyperbole's Action Key (`M-RET` by default) behaves when point is inside an Org major or minor mode buffer.
+
+<Info>
+This variable only takes effect when `hyperbole-mode` is active. It has no impact outside of Org-related buffers.
+</Info>
+
+### Setting values
+
+```emacs-lisp
+;; Set before or after loading Hyperbole
+(setq hsys-org-enable-smart-keys t)
+```
+
+The three supported values produce the following behavior:
+
+<Tabs>
+  <Tab title="buttons (default)">
+    Hyperbole activates the Smart Keys **only** when point is on a Hyperbole button or an Org link. All other contexts fall through to `org-meta-return`.
+
+    This is the value Hyperbole sets during initialization when it detects that `org-meta-return` shares the same key as the Action Key.
+
+    | Context | Action Key does |
+    |---|---|
+    | Hyperbole button | Activate button |
+    | Org link | Follow link |
+    | Anything else | `org-meta-return` |
+  </Tab>
+  <Tab title="t">
+    Hyperbole's Smart Keys are fully active in Org buffers and handle all recognized contexts: headlines, source blocks, tables, tags, timestamps, and more. There is no fallback to `org-meta-return`.
+
+    | Context | Action Key does |
+    |---|---|
+    | Hyperbole button | Activate button |
+    | Org link | Follow link |
+    | Org headline | Cycle visibility |
+    | Org table | Navigate/edit cell |
+    | Anything else | Hyperbole context action |
+  </Tab>
+  <Tab title="nil">
+    Hyperbole's Smart Keys are entirely disabled within Org buffers. Org retains its default `M-RET` behavior (`org-meta-return`) throughout.
+
+    | Context | Action Key does |
+    |---|---|
+    | Any | `org-meta-return` |
+  </Tab>
+</Tabs>
+
+You can inspect and change this setting interactively via the Hyperbole Customization menu (`{C-h h c}`), under the `hyperbole-buttons` group.
+
+---
+
+## Org link support
+
+Hyperbole recognizes and activates standard Org `[[...]]` links in **any buffer**, not just Org buffers. The `org-link` action type is defined in `hsys-org.el`:
+
+```emacs-lisp
+;; Follow an Org link at point from any buffer
+(defact org-link (&optional link)
+  "Follow an optional Org mode LINK to its target.
+If LINK is nil, follow any link at point.")
+```
+
+Pressing the Action Key on `[[file:notes.org][My Notes]]` in a plain text buffer will open the linked file, exactly as it would inside an Org buffer.
+
+### Internal target links
+
+Org `<<target>>` definitions are also supported. Pressing the Action Key on an internal target jumps to the first link that references it:
+
+```emacs-lisp
+(defact org-internal-target-link (&optional internal-target)
+  "Follow an optional Org mode <<INTERNAL-TARGET>> back to any first link to it.")
+```
+
+### Radio targets
+
+Radio targets — Org targets that auto-link anywhere they appear in the file — are handled by `org-radio-target-link`:
+
+```emacs-lisp
+(defact org-radio-target-link (&optional target)
+  "Follow an optional Org mode radio <<TARGET>> back to any first link to it.")
+```
+
+---
+
+## Smart Key behavior in specific Org contexts
+
+When `hsys-org-enable-smart-keys` is `t`, the Smart Keys adapt to the Org element under point.
+
+| Org context | Action Key behavior |
+|---|---|
+| Source block `#+begin_src` line | Identifies language; context-aware action |
+| Headline (`*`) | Cycles visibility (equivalent to `org-cycle`) |
+| Todo keyword | Cycles to next todo state |
+| Tags (`:tag:`) | Opens `org-tags-view` for matching headlines |
+| Org table | Navigates or edits the cell |
+| Timestamp | Follows or edits the timestamp |
+| Agenda item | Jumps to the source heading |
+
+The function `hsys-org-at-read-only-p` detects read-only Org contexts (checkboxes, headline stars, item bullets, keywords, links, priorities, table specials, tags, todo keywords) and adjusts behavior accordingly.
+
+<Tip>
+Use `{C-u M-RET}` (the Assist Key) on any Org element to see what the Action Key will do before pressing it.
+</Tip>
+
+---
+
+## Searching Org files with Consult
+
+`hsys-org-consult-grep` lets you interactively search your entire `org-directory` using `consult-grep` or `consult-ripgrep`:
+
+```emacs-lisp
+;; Search all .org files in org-directory
+M-x hsys-org-consult-grep
+
+;; Search only headlines (lines starting with *)
+;; Pass a prefix arg (C-u) to limit to headlines
+```
+
+The function automatically scopes the search to `*.org` files and uses ripgrep when available.
+
+---
+
+## HyWiki and Org mode
+
+HyWiki stores its pages as `.org` files. When HyWiki mode is active, WikiWord links are recognized as implicit buttons in Org buffers.
+
+### `[[hy:WikiWord]]` links in Org files
+
+You can reference HyWiki pages using a special Org link type inside any `.org` file:
+
+```org
+See [[hy:ProjectNotes]] for context.
+
+Or link to a specific section:
+[[hy:ProjectNotes#Implementation]]
+```
+
+The `hy:` link type is registered with Org mode when HyWiki is active. Pressing the Action Key on such a link — or simply clicking it in Org mode — opens the corresponding HyWiki page.
+
+<Note>
+When `hsys-org-link-at-p` encounters a `[[hy:WikiWord]]` link, it deliberately ignores it as an Org link and defers to the `hywiki-word` implicit button type instead, which handles HyWiki page resolution.
+</Note>
+
+### Tag navigation across HyWiki
+
+When point is on an Org tag (`:tag:`) inside a HyWiki buffer, the Action Key calls `hywiki-tags-view` to display all HyWiki headlines with that tag. The correct view function is chosen automatically based on which directory the current buffer file belongs to:
+
+- Files in `org-directory` → `hsys-org-tags-view`
+- Files in `org-roam-directory` → `hsys-org-roam-tags-view`
+- HyWiki files → `hywiki-tags-view`
+- HyRolo files → `hyrolo-tags-view`
+
+---
+
+## Org Roam integration
+
+`hsys-org-roam.el` provides Hyperbole support for [Org Roam](https://www.orgroam.com/) note databases.
+
+### Full-text search over Org Roam notes
+
+```emacs-lisp
+M-x hsys-org-roam-consult-grep
+```
+
+This uses `consult-org-roam-grep-func` (from the `consult-org-roam` package) to run an interactive grep over `org-roam-directory`. The `consult-org-roam` package is automatically installed on first use if not already present.
+
+### Tag-based navigation in Org Roam
+
+```emacs-lisp
+M-x hsys-org-roam-tags-view
+```
+
+Prompts for colon-separated Org tags (e.g. `:project:active:`) and displays all matching Org Roam headlines in a `*Org Roam Tags*` buffer. Accepts a prefix argument to limit matches to todo items only.
+
+The function scopes `org-agenda-files` to `org-roam-directory` for the duration of the search, so the standard `org-tags-view` machinery is reused.
+
+<Tip>
+You can redo the last tags search with `{C-u r}` from within the `*Org Roam Tags*` results buffer.
+</Tip>
+
+---
+
+## HyNote: linking to Org and Org Roam notes by name
+
+`hynote.el` provides the `hynote-file` implicit button type, which lets you reference Org and Org Roam notes — and other supported formats — by their filename stem, without delimiters or file extensions.
+
+```text
+my-org-file-stem#headline
+```
+
+Pressing the Action Key on such a reference jumps to the headline inside the file. HyNote supports Org, Markdown, Koutline, and Emacs Outline file formats.
+
+```emacs-lisp
+;; Default search directories
+(defvar hynote-directory-list '("~/org/" "~/org-roam/")
+  "Directories in which to find HyNote Org files.")
+```
+
+### Priority relative to HyWiki
+
+`hynote-file` is one of Hyperbole's lowest-priority implicit button types. The `hywiki-word` type is checked first, so a name that matches a HyWiki page will open the wiki page rather than a note file.
+
+<Note>
+HyNote is an early-stage system. Its current purpose is to provide HyWikiWord-style navigation for Org directory and Org Roam files. Future versions will support universal linking across many file formats using UUIDs and HyRolo.
+</Note>
+
+---
+
+## Compatibility notes
+
+- **Org version conflicts**: If you have both a built-in and a package version of Org, `hsys-org-fix-version` reloads the correct one to avoid mixed-version problems. Run `M-x hsys-org-log-and-fix-version` to diagnose and repair version conflicts interactively.
+- **`{C-c C-@}`**: Hyperbole binds this key in `org-mode-map` to `hycontrol-windows-grid` (creates a grid of windows), but only if the key is not already bound.
+- **`outshine-mode` and `poporg-mode`**: Both are treated as Org-related contexts by `hsys-org-mode-p`, so Smart Key support applies in those modes as well.

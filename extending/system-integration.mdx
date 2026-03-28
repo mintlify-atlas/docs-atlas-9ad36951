@@ -1,0 +1,372 @@
+---
+title: "System Integration"
+description: "Integrate external systems, mail readers, file managers, and path-resolution behavior with GNU Hyperbole using the hsys-* pattern, hpath.el, hmail.el, and hbmap.el."
+---
+
+Hyperbole is designed to be extended to work with external Emacs packages and system facilities. The codebase uses a consistent set of patterns for this: `hsys-*.el` files for external system encapsulations, `hmail.el` for an abstract mail interface, `hpath.el` for all path resolution, and `hbmap.el` for the button map that tracks where buttons are stored.
+
+## The `hsys-*` pattern
+
+Every file in Hyperbole that provides glue between Hyperbole and an external package follows the naming convention `hsys-<system>.el`. These files:
+
+- Import or conditionally require the external package
+- Define Hyperbole-aware wrapper functions or Smart Key handlers
+- Register any ibtypes or actypes needed to handle that system's buffer content
+- Are loaded on demand — Hyperbole only activates them when the corresponding package is available
+
+| File | Integrates |
+|------|-----------|
+| `hsys-org.el` | Org mode — smart key behavior in Org buffers |
+| `hsys-org-roam.el` | Org Roam — link following and node lookup |
+| `hsys-www.el` | Web browsing — URL following via `browse-url` |
+| `hsys-xref.el` | Emacs xref — tag jumping in source code |
+| `hsys-youtube.el` | YouTube — timestamped video playback |
+| `hsys-activities.el` | Activities — workspace session management |
+| `hsys-consult.el` | Consult — enhanced grep and navigation |
+| `hsys-ert.el` | ERT — jumping to failing test `should` lines |
+| `hsys-flymake.el` | Flymake — linter keymap integration |
+
+<Tip>
+To integrate your own Emacs package with Hyperbole, follow this pattern: create `hsys-mypkg.el` with the integration code and use `(eval-after-load "mypkg" ...)` or `(require 'mypkg nil t)` so it only activates when your package is present.
+</Tip>
+
+### Minimal `hsys-*` template
+
+```emacs-lisp
+;;; hsys-mypkg.el --- Hyperbole support for mypkg  -*- lexical-binding: t; -*-
+
+(require 'package) ;; Always keep this first for package activation
+(require 'hypb)
+
+(or (require 'mypkg nil t)
+    (and (package-installed-p 'mypkg)
+         (package-activate 'mypkg))
+    (hypb:require-package 'mypkg))
+
+;;; Smart Key handler for mypkg's major mode
+(defun smart-mypkg ()
+  "Single key actions in mypkg buffers.
+Invoked via a Smart Key press when in mypkg-mode."
+  (cond
+   (assist-flag
+    ;; Assist Key: show help
+    (mypkg-show-help))
+   (t
+    ;; Action Key: follow link or item
+    (mypkg-follow-at-point))))
+
+(provide 'hsys-mypkg)
+```
+
+## Mail system integration
+
+Hyperbole supports multiple Emacs mail readers through an abstract interface defined in `hmail.el`. The four mode variables that define the interface are:
+
+```emacs-lisp
+(defvar hmail:composer  'message-mode
+  "Major mode for composing mail to be sent with Hyperbole buttons.")
+(defvar hmail:lister    nil
+  "Major mode for listing mail header summaries with Hyperbole buttons.")
+(defvar hmail:modifier  nil
+  "Major mode for editing received mail with Hyperbole buttons.")
+(defvar hmail:reader    nil
+  "Major mode for reading mail with Hyperbole buttons.")
+```
+
+Each concrete mail system implementation (Rmail via `hrmail.el`, MH-E via `hmh.el`, GNUS via `hgnus.el`) sets these variables to the appropriate major mode symbols and then calls `hmail:init` to wire up the shared interface.
+
+### `hmail:init` — connecting a mail reader
+
+`hmail:init` creates function aliases so that the generic `hmail:*` function names resolve to the reader-specific implementations:
+
+```emacs-lisp
+(defun hmail:init (class-prefix func-suffix-list)
+  "Set up CLASS-PREFIX functions with aliases for FUNC-SUFFIX-LIST.
+`hmail:reader' should be set appropriately before this is called."
+  (when hmail:reader
+    (let* ((reader-name (symbol-name hmail:reader))
+           (reader-prefix (capitalize
+                           (substring reader-name
+                                      0 (string-match "-" reader-name))))
+           hmail-func)
+      (mapcar (lambda (func-suffix)
+                (setq hmail-func (replace-regexp-in-string
+                                  "Summ-" "" func-suffix nil t))
+                (defalias (intern (concat class-prefix hmail-func))
+                  (intern (concat reader-prefix "-" func-suffix))))
+              func-suffix-list))))
+```
+
+For example, `hrmail.el` calls:
+
+```emacs-lisp
+(setq hmail:reader    'rmail-mode
+      hmail:lister    'rmail-summary-mode
+      hmail:modifier  'rmail-edit-mode)
+
+(hmail:init "rmail:" '("msg-to-p" "Summ-msg-to" ...))
+```
+
+This makes `rmail:msg-to-p` an alias for `rmail-msg-to-p`, and so on.
+
+### Activating mail system support
+
+Set `hmail:init-function` to one of the supported values before Hyperbole initializes, or call the init function manually:
+
+```emacs-lisp
+;; In your init.el, before (hyperbole-mode 1):
+(setq hmail:init-function 'Rmail-init)   ;; Rmail
+;; or
+(setq hmail:init-function 'Mh-init)      ;; MH-E
+```
+
+### Helper predicates
+
+Once a mail reader is configured, these predicates work in any code:
+
+```emacs-lisp
+(hmail:browser-p)   ;; Non-nil when in a mail reading or listing buffer
+(hmail:editor-p)    ;; Non-nil when in a mail composing or editing buffer
+(hmail:lister-p)    ;; Non-nil when in the mail summary/listing buffer
+```
+
+## Path handling with `hpath.el`
+
+`hpath.el` is the central library for all file and URL resolution in Hyperbole. Every button that references a file or path goes through functions here.
+
+### `hpath:find` — open any path
+
+`hpath:find` is the primary entry point for displaying a file. It handles special path prefixes, variable expansion, anchor navigation, and external viewer dispatch:
+
+```emacs-lisp
+(hpath:find PATHNAME &optional DISPLAY-WHERE NOSELECT)
+```
+
+**Special prefix characters:**
+
+| Prefix | Effect |
+|--------|--------|
+| `!pathname` | Execute as a non-windowed shell program |
+| `&pathname` | Execute as a windowed (GUI) program |
+| `-pathname` | Load as an Emacs Lisp file |
+
+**Path suffixes and anchors:**
+
+```emacs-lisp
+;; Jump to a named section within a file
+(hpath:find "~/.bashrc#Alias Section")
+
+;; Jump to line 42, column 5
+(hpath:find "~/src/main.c:42:5")
+
+;; Jump to line 42 with explicit L prefix
+(hpath:find "~/src/main.c:L42")
+```
+
+**Variable expansion:**
+
+```emacs-lisp
+;; ${variable} syntax is expanded before the path is resolved
+(hpath:find "${hyperb:dir}/DEMO")
+```
+
+### `hpath:display-where` — control where files open
+
+The variable `hpath:display-where` is a symbol controlling the default window for displaying linked files. Set it globally or bind it temporarily:
+
+```emacs-lisp
+;; Globally change where files are displayed
+(setq hpath:display-where 'other-window)  ;; default
+(setq hpath:display-where 'this-window)
+(setq hpath:display-where 'new-frame)
+(setq hpath:display-where 'other-frame)
+(setq hpath:display-where 'one-window)
+(setq hpath:display-where 'other-frame-one-window)
+```
+
+Pass a `DISPLAY-WHERE` symbol directly to `hpath:find` to override for a single call:
+
+```emacs-lisp
+(hpath:find "~/notes/todo.org" 'this-window)
+```
+
+`hpath:display-buffer` does the same for buffers (rather than files):
+
+```emacs-lisp
+(hpath:display-buffer (get-buffer "*scratch*") 'new-frame)
+```
+
+### `hpath:substitute-var` — replace path prefixes with variable references
+
+When Hyperbole stores a button's file path, it calls `hpath:substitute-var` to make the path relocatable by replacing any leading directory that matches a variable in `hpath:variables` with a `${variable}` reference:
+
+```emacs-lisp
+;; hpath:variables contains: '(hyperb:dir hywiki-directory load-path ...)
+;; Example: if hyperb:dir is "/home/bob/.emacs.d/elpa/hyperbole-9.0.0/"
+(hpath:substitute-var "/home/bob/.emacs.d/elpa/hyperbole-9.0.0/DEMO")
+;; => "${hyperb:dir}DEMO"
+```
+
+Add your own variables so that your project paths are stored portably:
+
+```emacs-lisp
+(add-to-list 'hpath:variables 'my-project-dir)
+```
+
+### `hpath:www-p` — check whether a path is a URL
+
+```emacs-lisp
+(hpath:www-p "https://www.gnu.org/software/hyperbole/")
+;; => "https://www.gnu.org/software/hyperbole/"  (returns path if URL, else nil)
+
+(hpath:www-p "/usr/local/share/doc/hyperbole/")
+;; => nil
+```
+
+`hpath:www-p` returns the path itself (a truthy value) when it is a URL, and nil otherwise. This makes it convenient in conditionals:
+
+```emacs-lisp
+(if (hpath:www-p path)
+    (hact 'www-url path)
+  (hact 'hpath:find path))
+```
+
+<Note>
+`hpath:www-at-p` is the point-based variant — it returns the URL under point, including its start and end positions, or nil when point is not on a URL.
+</Note>
+
+## The `hypb.el` utility library
+
+`hypb.el` provides miscellaneous utilities used throughout Hyperbole. Commonly useful functions for integrators:
+
+| Function | Description |
+|----------|-------------|
+| `hypb:buffer-file-name` | Like `buffer-file-name` but handles indirect buffers |
+| `hypb:call-process-p PROGRAM &rest ARGS` | Run external program; return t if exit code is 0 |
+| `hypb:error FORMAT &rest ARGS` | Signal a `user-error` with a formatted message |
+| `hypb:eval SEXP` | Evaluate a Lisp form safely, supporting both lists and symbols |
+| `hypb:require-package PACKAGE` | Ensure PACKAGE is installed; prompt to install if missing |
+| `hypb:configuration &optional BUF` | Insert Hyperbole configuration info at end of BUF |
+| `hypb:indirect-function SYMBOL` | Like `indirect-function` but handles autoloads safely |
+
+```emacs-lisp
+;; Ensure a package is present before using it
+(hypb:require-package 'treemacs)
+
+;; Run a shell check as part of an action
+(when (hypb:call-process-p "git" nil nil "status" "--short")
+  (message "In a git repository"))
+
+;; Raise a clean user-facing error
+(hypb:error "(my-action): Cannot find file: %s" path)
+```
+
+## `hbmap.el` — querying the button map
+
+Hyperbole tracks every directory in which a user has created explicit buttons. This data lives in `~/.hyperb/HBMAP` by default.
+
+```emacs-lisp
+(defvar hbmap:dir-user   "~/.hyperb/"
+  "Per user directory for top level Hyperbole map data.")
+
+(defvar hbmap:dir-filename (expand-file-name "HBMAP" hbmap:dir-user)
+  "File listing all dirs in which a user has written buttons.")
+```
+
+### Looking up and managing button directories
+
+```emacs-lisp
+;; Return a list of all directories that contain explicit button data
+(hbmap:dir-list)
+;; => ("/home/bob/notes/" "/home/bob/projects/myproject/")
+
+;; Check if a directory is registered
+(hbmap:dir-member "/home/bob/notes/")
+;; => t (and leaves point at the HBMAP entry)
+
+;; Register a directory (called automatically when a button is created)
+(hbmap:dir-add "/home/bob/new-project/")
+
+;; Unregister a directory
+(hbmap:dir-remove "/home/bob/old-project/")
+```
+
+<Tip>
+`hbmap:dir-list` is the starting point for tools that want to search all button data. Each directory in the list may contain a `.hypb` button data file (or `_hypb` on Windows). Use `ebut:map` to iterate over all explicit buttons in a directory.
+</Tip>
+
+## Treemacs integration
+
+Hyperbole provides Smart Key support for the Treemacs file manager via `hui-treemacs.el`. When Treemacs is installed (version 2 or later), Hyperbole's Action Key and Assist Key work intelligently in Treemacs buffers:
+
+- **Action Key** on a file node: open the file in another window
+- **Action Key** on a directory node: expand/collapse the subtree
+- **Action Key** on a project header: toggle the project display
+- **Assist Key**: show Treemacs help or navigate toward the root
+
+```emacs-lisp
+;; Treemacs integration is loaded automatically when treemacs is available.
+;; You can also load it explicitly:
+(require 'hui-treemacs)
+```
+
+The integration file registers its Smart Key handler by advising or extending `hmouse-drv.el`'s dispatch logic rather than defining new key bindings — no new keys are introduced.
+
+## Dired-sidebar integration
+
+`hui-dired-sidebar.el` provides the same pattern for the `dired-sidebar` package:
+
+```emacs-lisp
+(defun smart-dired-sidebar ()
+  "Use a single key or mouse key to manipulate directory entries.
+If key is pressed:
+ (1) within an entry line, display the item for editing in another window,
+     or if it is a directory and `dired-sidebar-cycle-subtree-on-click' is t,
+     expand and collapse the entry
+ (2) at the end of an entry line: scroll up or down proportionally")
+```
+
+As with Treemacs, this is loaded on demand via `(eval-and-compile (require 'dired-sidebar nil t))`. No configuration is needed; the Smart Key gains sidebar-aware behavior automatically.
+
+<AccordionGroup>
+  <Accordion title="Writing your own hsys file">
+    A minimal `hsys-mypkg.el` file structure:
+
+    1. **Require** the external package conditionally with `(require 'mypkg nil t)`.
+    2. **Define** a `smart-mypkg` function that dispatches Action/Assist Key behavior using `assist-flag`.
+    3. **Register** the smart handler in `hmouse-drv.el`'s mode dispatch by adding an entry to `hmouse-context-default-handler` or by adding an entry to `smart-key-alist` in your package's setup code.
+    4. **Load ibtypes or actypes** if your package has recognizable text patterns (e.g., `hib-debbugs.el` adds an ibtype for GNU debbugs issue references).
+
+    ```emacs-lisp
+    ;; Register the Smart Key handler for your package's mode
+    (add-to-list 'hmouse-context-default-handler
+                 '(mypkg-mode . smart-mypkg))
+    ```
+  </Accordion>
+
+  <Accordion title="Storing portable paths in buttons">
+    When a button stores a path, Hyperbole calls `hpath:substitute-var` so the stored path contains `${variable}` instead of a literal directory prefix. This makes buttons portable across machines.
+
+    To make your project directory portable, add its variable to `hpath:variables`:
+
+    ```emacs-lisp
+    (defvar my-notes-dir "~/Documents/notes/")
+    (add-to-list 'hpath:variables 'my-notes-dir)
+    ```
+
+    Now any button pointing to a file under `~/Documents/notes/` stores the path as `${my-notes-dir}file.org` instead of the absolute path.
+  </Accordion>
+
+  <Accordion title="Using hpath:find-line for precise file navigation">
+    When you need to open a file and jump to a specific line and column, use `hpath:find-line` rather than combining `find-file` and `goto-char`:
+
+    ```emacs-lisp
+    (hpath:find-line FILENAME LINE-NUM &optional COL-NUM DISPLAY-WHERE)
+    ```
+
+    ```emacs-lisp
+    ;; Open a file at line 120, column 4, in another window
+    (hpath:find-line "~/src/main.c" 120 4 'other-window)
+    ```
+  </Accordion>
+</AccordionGroup>

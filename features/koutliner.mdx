@@ -1,0 +1,217 @@
+---
+title: "Koutliner"
+description: "Multi-level autonumbered hierarchical outliner with permanent node IDs for stable hypertext links, flexible view specs, and full Org table support."
+---
+
+The Koutliner is Hyperbole's outlining system. It produces hierarchically structured files made up of trees of **cells** — the Koutliner's term for outline nodes. Every cell receives an autonumbered label and a permanent unique identifier, making it possible to create stable hyperlinks to any cell that survive structural reorganization.
+
+Koutline files use the `.kotl` extension and open automatically in `kotl-mode`.
+
+## Getting started
+
+<Steps>
+  <Step title="Open the interactive demo">
+    Press `C-h h k e` to open the Koutliner example file. It is a live, editable demonstration of all Koutliner features and serves as a built-in reference.
+  </Step>
+  <Step title="Create a new outline">
+    Open or create any file with a `.kotl` extension. Emacs automatically activates `kotl-mode`.
+  </Step>
+  <Step title="Start typing">
+    Click or move point into any cell and type. The Koutliner manages indentation and numbering for you. All standard Emacs editing commands work normally.
+  </Step>
+</Steps>
+
+## Cell labels and numbering
+
+Each cell has two kinds of identifier:
+
+<AccordionGroup>
+  <Accordion title="Relative label (autonumber)">
+    A position-based label that reflects the cell's current place in the outline hierarchy, such as `1`, `2a`, `2b1`, or `1.4.8.6` (legal format). Labels renumber automatically whenever any cell or tree is moved, promoted, or demoted.
+
+    Two label formats are available:
+
+    - **Augment style** (default): `1`, `1a`, `1a1`, `1a1a` — shorter and faster to read
+    - **Legal style**: `1`, `1.1`, `1.1.1` — familiar from legal documents
+
+    Switch label types with `C-c C-l ? RET`.
+  </Accordion>
+  <Accordion title="Permanent ID (idstamp)">
+    An integer assigned once when the cell is created and never changed, regardless of how the outline is reorganized. Idstamps are numbered from 0 (the invisible root cell). They always begin with `0` when displayed, e.g. `012`.
+
+    Display idstamps instead of relative labels with `C-c C-l id RET`. Idstamps are what make klinks reliable hypertext anchors.
+  </Accordion>
+</AccordionGroup>
+
+## Navigation
+
+| Key | Action |
+|---|---|
+| `C-c ,` | Move to the beginning of the current cell |
+| `C-c .` | Move to the end of the current cell |
+| `C-c C-n` | Move to the next visible cell (any level) |
+| `C-c C-p` | Move to the previous visible cell (any level) |
+| `C-c C-f` | Move to this cell's successor (next sibling) |
+| `C-c C-b` | Move to this cell's predecessor (previous sibling) |
+| `C-c C-d` | Move to the first child of the current cell |
+| `C-c C-u` | Move to the parent cell |
+| `C-c <` | Move to the first sibling at the current level |
+| `C-c >` | Move to the last sibling at the current level |
+| `C-c ^` | Move to the level-1 root of the current tree |
+| `C-c $` | Move to the last cell in the tree rooted at point |
+
+## Editing cells and trees
+
+### Creating cells
+
+| Key | Action |
+|---|---|
+| `C-j` | Add a new sibling cell after the current cell |
+| `C-u C-j` or `C-c a` | Add a new child cell inside the current cell |
+| `C-c p` | Add a new preceding sibling immediately before the current cell |
+| `C-u C-c p` | Add a sibling of the current cell's parent |
+
+### Promoting and demoting trees
+
+| Key | Action |
+|---|---|
+| `TAB` | Demote the current tree one level |
+| `M-TAB` or `Shift-TAB` | Promote the current tree one level |
+| `M-0 TAB` | Demote and refill each cell in the tree |
+| `M-0 M-TAB` | Promote and refill each cell in the tree |
+
+### Moving trees
+
+| Key | Action |
+|---|---|
+| `M-<down>` | Move the current tree past the next same-level tree |
+| `M-<up>` | Move the current tree before the previous same-level tree |
+| `C-c m` | Move a tree to follow as a sibling of a target cell |
+| `C-u C-c m` | Move a tree to follow as the first child of a target cell |
+| `C-c C-m` | Move a tree to precede a target cell |
+
+### Deleting cells
+
+| Key | Action |
+|---|---|
+| `C-c C-k` | Kill the current cell and its entire subtree |
+| `C-c k` | Kill the current cell's contents from point to end of cell |
+| `C-u C-c k` | Kill the entire contents of the current cell |
+| `C-c s` | Split the current cell into two sibling cells at point |
+| `C-u C-c s` | Split and make the new cell the first child, not a sibling |
+| `C-c +` | Append the contents of one cell to another |
+
+### Filling
+
+| Key | Action |
+|---|---|
+| `M-q` or `M-j` | Refill the current paragraph within the cell |
+| `C-c M-q` or `C-c M-j` | Refill all paragraphs within the current cell |
+| `C-M-q` or `C-M-j` | Refill all cells in the current tree |
+
+## Hiding and showing
+
+| Key | Action |
+|---|---|
+| `C-c C-h` | Hide (collapse) the tree rooted at point |
+| `C-c C-s` | Show (expand) the tree rooted at point |
+| `C-c C-a` | Show all cells in the outline |
+| `C-x $` | Show all cells down to a specified level |
+| `C-M-h` | Hide the subtree at point, keeping the root visible |
+| `C-c C-o` | Overview: show only the first line of each cell |
+| `C-c C-t` | Top-level: hide all cells below level 1 |
+
+<Tip>
+These hide/show commands work even in read-only buffers, for example when a file is not checked out from version control.
+</Tip>
+
+## Klinks: hyperlinks to cells
+
+A **klink** is an implicit Hyperbole button that jumps to a specific cell in a koutline. Klinks are stable because they can reference a cell by its permanent idstamp.
+
+### Klink syntax
+
+```text
+<#3b=08>          Jump to cell with relative id 3b / permanent id 08
+<@ 3b=08>         Same as above (alternate syntax)
+<#08>             Jump by permanent id only
+<#3b>             Jump by relative id (fragile — breaks if cell moves)
+
+<EXAMPLE.kotl#4=012|c1e>   Open EXAMPLE.kotl at cell with permanent id 012,
+                             using view spec: clip at 1 line, show ellipses
+
+<|ben>            Apply a view spec to the current outline
+```
+
+### Inserting klinks
+
+<Tabs>
+  <Tab title="With a mouse">
+    Click the Action Key (`M-RET`) within the indentation area to the left of a cell's text. Then double-click the root cell of the target. A klink is inserted at the starting position.
+  </Tab>
+  <Tab title="From keyboard">
+    Press `C-c l` when inside a koutline, or `C-h h k l` when outside one, to insert a klink interactively.
+  </Tab>
+  <Tab title="Copy and yank">
+    Place point on a klink with no active region and press `M-w` to copy it. Press `M-w` outside a klink to copy a reference to the current cell. Then `C-y` yanks the klink into any buffer.
+  </Tab>
+</Tabs>
+
+## View specifications
+
+A **viewspec** is a short string of codes that controls how a koutline is displayed. Viewspecs can be embedded in klinks or applied interactively.
+
+Press `C-c C-v` to enter a viewspec string. The current viewspec is shown in the modeline between `<|` and `>`, e.g. `<|ben>`.
+
+| Code | Meaning |
+|---|---|
+| `a` | Show all cell levels and all lines |
+| `b` | Show blank lines between cells |
+| `cN` | Clip cells to at most N lines (0 = no clipping) |
+| `e` | Show ellipses when content is hidden |
+| `lN` | Hide cells deeper than level N (0 = show all) |
+| `n` | Use the default label type |
+| `n0` | Display permanent idstamps instead of relative labels |
+| `n1` | Display alpha labels (Augment style) |
+| `n.` | Display legal (dotted numeric) labels |
+
+The viewspec is saved with the file and restored when you reopen it. The standard default is `<|ben>` (blank lines, ellipses, default numbering).
+
+### Viewspecs in klinks
+
+A klink may include a viewspec separated by `|`:
+
+```text
+<EXAMPLE.kotl, 4=012 |c1e>
+```
+
+This opens `EXAMPLE.kotl` at cell `012`, clipping each cell after one line and showing ellipses.
+
+## Org table support
+
+The Koutliner supports editing Org tables inside cells. Place the table starting on the first line of the cell (tables require only blanks to the left of each row).
+
+| Action | Inside Org table | Outside Org table |
+|---|---|---|
+| Promote | `C-c C-,` | `M-TAB` / `Shift-TAB` |
+| Demote | `C-c C-.` | `TAB` |
+
+## Importing and exporting
+
+| Command | Action |
+|---|---|
+| `M-x kotl-mode RET` | Convert the current text buffer to a koutline in place |
+| `M-x kimport:text RET` | Import a text file into a new koutline (original intact) |
+| `M-x kimport:star-outline RET` | Import a standard Emacs star-outline file |
+| `M-x kimport:file RET` | Import a file, auto-detecting the type from its suffix |
+| `C-x i` | Insert elements of another buffer or file as cells |
+| `M-x kexport:html RET` | Export the koutline to an indented HTML file with hyperlinks |
+
+## Key customization variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `kotl-mode:refill-flag` | `nil` | When non-nil, automatically refill cells during move, copy, promote, and demote operations |
+| `kotl-mode:tab-flag` | `nil` | When non-nil, `TAB` inserts a literal tab character instead of demoting the tree |
+| `kotl-mode:indent-tabs-mode` | `t` | Whether `TAB` may insert literal tab characters |
+| `kotl-mode:shrink-region-flag` | `nil` | When non-nil, shrink the region to the visible bounds of a single cell before editing |

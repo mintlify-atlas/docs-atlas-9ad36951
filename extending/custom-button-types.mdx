@@ -1,0 +1,257 @@
+---
+title: "Custom Button Types"
+description: "Define new explicit button action types using defact, call them programmatically with hact, and create buttons that use your type."
+---
+
+Hyperbole's explicit button system is built on _action types_ — named, parameterized units of behavior. Every explicit button stores a reference to an action type and the arguments to pass to it. The `defact` macro lets you add your own action types alongside the built-in ones.
+
+## The `defact` macro
+
+`defact` is defined in `hact.el` and creates a new action type in the `actypes` namespace.
+
+```emacs-lisp
+(defact NAME PARAMS DOC &rest DEFAULT-ACTION)
+```
+
+| Parameter        | Description |
+|------------------|-------------|
+| `NAME`           | Unquoted symbol — becomes `actypes::NAME` internally |
+| `PARAMS`         | Argument list, same syntax as `defun` |
+| `DOC`            | Required documentation string |
+| `DEFAULT-ACTION` | One or more body forms; the list forms the function body |
+
+The macro expands to a `defun` under the `actypes::` namespace, registers the symbol in the `symtable:actypes` hash table, and adds the name to the ordered `actypes` symset so Hyperbole can enumerate all action types.
+
+```emacs-lisp
+;; Simplified expansion of (defact my-type (arg) "Doc." (do-something arg))
+;;
+;;   (defun actypes::my-type (arg) "Doc." (do-something arg))
+;;   (symset:add 'my-type 'actypes 'symbols)
+```
+
+<Note>
+The syntax of `defact` is intentionally identical to `defun`, but a documentation string is **required**. Hyperbole displays this string in button help.
+</Note>
+
+### Interactive form
+
+If a button of your type can be created interactively (so Hyperbole can prompt the user for arguments when creating a button), include an `(interactive ...)` form as the first form of the body, just as you would in an ordinary Emacs command.
+
+```emacs-lisp
+(defact my-url-opener (url)
+  "Open URL in the system browser."
+  (interactive "sURL to open: ")
+  (browse-url url))
+```
+
+## Real examples from `hactypes.el`
+
+### `display-variable` — evaluate and display a variable value
+
+```emacs-lisp
+(defact display-variable (var)
+  "Evaluate VAR (a symbol) and display a message with the result value.
+Return any non-nil value or t."
+  (interactive "vDisplay value of variable: ")
+  (message "%s = %S" var (symbol-value var))
+  (or (symbol-value var) t))
+```
+
+Notice the return value: `(or (symbol-value var) t)`. Action types must not return `nil` — Hyperbole interprets a `nil` return as "no action was taken." If your action's natural result could be `nil`, add `(or result t)`.
+
+### `exec-shell-cmd` — run an asynchronous shell command
+
+```emacs-lisp
+(defact exec-shell-cmd (shell-cmd &optional internal-cmd kill-prev)
+  "Execute a SHELL-CMD string asynchronously.
+Optional non-nil second argument INTERNAL-CMD inhibits display of the shell
+command line executed.  Optional non-nil third argument KILL-PREV means
+kill the last output to the shell buffer before executing SHELL-CMD."
+  (interactive
+   (let ((default  (nth 0 hargs:defaults))
+         (default1 (nth 1 hargs:defaults))
+         (default2 (nth 2 hargs:defaults)))
+     (list (hargs:read "Shell cmd: "
+                       (lambda (cmd) (not (string-equal cmd "")))
+                       default "Enter a shell command." 'string)
+           (y-or-n-p (format "Omit cmd from output (default = %s)? "
+                             default1))
+           (y-or-n-p (format "Kill prior cmd's output (default = %s)? "
+                             default2)))))
+  (require 'comint)
+  ;; ... body elided for brevity
+  )
+```
+
+### `link-to-bookmark` — jump to an Emacs bookmark
+
+```emacs-lisp
+(defact link-to-bookmark (bookmark)
+  "Display an Emacs BOOKMARK (a name).
+When creating the button, if in Bookmark Menu mode, use the bookmark
+nearest point as the default."
+  (interactive
+   (list (bookmark-completing-read "Bookmark to link to"
+                                   (if (derived-mode-p 'bookmark-bmenu-mode)
+                                       (bookmark-bmenu-bookmark)
+                                     bookmark-current-bookmark))))
+  (bookmark-jump bookmark (hpath:display-buffer-function)))
+```
+
+## Step-by-step: creating a new action type
+
+This walkthrough creates a `notify-desktop` action type that sends an OS desktop notification.
+
+<Steps>
+  <Step title="Write the defact form">
+    Put the form in your Emacs init file or a dedicated library file that you load at startup.
+
+    ```emacs-lisp
+    (defact notify-desktop (title message &optional urgency)
+      "Send a desktop notification with TITLE and MESSAGE.
+    Optional URGENCY is one of \"low\", \"normal\" or \"critical\";
+    defaults to \"normal\".
+    Return t on success, nil on failure."
+      (interactive
+       (list (read-string "Notification title: ")
+             (read-string "Message: ")
+             (completing-read "Urgency (default normal): "
+                              '("low" "normal" "critical")
+                              nil nil "normal")))
+      (let ((urgency (or urgency "normal")))
+        (when (executable-find "notify-send")
+          (call-process "notify-send" nil nil nil
+                        "-u" urgency title message)
+          t)))
+    ```
+  </Step>
+
+  <Step title="Load the definition">
+    Either evaluate the form with `C-x C-e`, or ensure the file containing it is required or loaded before Hyperbole finishes initializing.
+
+    ```emacs-lisp
+    ;; In your init.el, after (require 'hyperbole):
+    (load "~/elisp/my-hactypes.el")
+    ```
+
+    Verify that the type is registered:
+
+    ```emacs-lisp
+    (htype:names 'actypes)
+    ;; Should include "notify-desktop" in the returned list
+    ```
+  </Step>
+
+  <Step title="Test it with hact">
+    `hact` is the low-level function that invokes any action type or Emacs function by name. It is also what implicit button type bodies call internally.
+
+    ```emacs-lisp
+    ;; Call with positional arguments — no interactive prompt
+    (hact 'notify-desktop "Build done" "Tests passed" "normal")
+    ```
+
+    `hact` sets the `actype` attribute on `hbut:current` and then calls `actype:act`, which handles argument path-expansion and runs `action-act-hook` before executing.
+  </Step>
+
+  <Step title="Create an explicit button using your type">
+    With point at any location in a writable buffer, run:
+
+    ```
+    M-x hui:ebut-create RET
+    ```
+
+    Hyperbole prompts for:
+    1. A label for the button
+    2. An action type — type `notify-desktop` and press `RET`
+    3. Each parameter: title, message, urgency
+
+    The button data is written to the buffer's associated `.hypb` data file.
+
+    You can also create a button programmatically by setting button attributes on `hbut:current` before calling `ebut:create`:
+
+    ```emacs-lisp
+    ;; Set attributes on hbut:current, then write the button data
+    (hattr:set 'hbut:current 'lbl-key   (hbut:label-to-key "Deploy alert"))
+    (hattr:set 'hbut:current 'actype    'actypes::notify-desktop)
+    (hattr:set 'hbut:current 'args      '("Deploy" "Production deploy complete" "critical"))
+    (hattr:set 'hbut:current 'loc       (hypb:buffer-file-name))
+    (hattr:set 'hbut:current 'dir       default-directory)
+    (ebut:create)
+    ```
+  </Step>
+
+  <Step title="Activate and verify">
+    Press the Action Key (`M-RET` by default) while point is on the button label. The desktop notification fires.
+
+    Press the Assist Key (`C-u M-RET`) on the button to see the help description, which displays your `defact` doc string.
+
+    ```emacs-lisp
+    ;; Check your type's documentation programmatically
+    (htype:doc 'actypes::notify-desktop)
+    ```
+  </Step>
+
+  <Step title="Delete the type if needed">
+    To remove your action type from the running session:
+
+    ```emacs-lisp
+    (actype:delete 'notify-desktop)
+    ```
+
+    This unbinds the `actypes::notify-desktop` symbol, removes it from the symtable and symset, and runs `htype-delete-hook`.
+  </Step>
+</Steps>
+
+## Using `hact` programmatically
+
+`hact` accepts a symbol (or symbol name) as its first argument and passes the rest as positional arguments to the action type:
+
+```emacs-lisp
+;; Using the Hyperbole action type symbol
+(hact 'link-to-file "~/notes/todo.org")
+
+;; Using a plain Emacs function symbol — also valid
+(hact 'find-file "~/notes/todo.org")
+
+;; Using actype:act directly (lower-level, same effect)
+(actype:act 'link-to-file "~/notes/todo.org")
+```
+
+<Tip>
+When an action type is defined with `defact`, its arguments that look like relative paths are automatically made absolute by `hpath:absolute-arguments` before the body executes. This does not happen when calling a plain Emacs function via `hact`.
+</Tip>
+
+## Listing and inspecting action types
+
+```emacs-lisp
+;; All registered action type names (definition names, no prefix)
+(htype:names 'actypes)
+
+;; All registered action type Elisp symbols (with actypes:: prefix)
+(htype:category 'actypes)
+
+;; Full documentation for a type
+(htype:doc 'actypes::link-to-file)
+
+;; Parameter list for a type
+(actype:param-list 'link-to-file)
+```
+
+<AccordionGroup>
+  <Accordion title="Return value contract">
+    Action type bodies must return non-nil to signal that an action was performed. Hyperbole converts a `nil` return to `t` in `actype:act`, but relying on that conversion makes your type's behavior harder to test. Explicitly return `t` or a meaningful non-nil value.
+  </Accordion>
+
+  <Accordion title="Namespace conventions">
+    All action types live in the `actypes::` namespace. When you write `(defact foo ...)`, Hyperbole creates and binds `actypes::foo`. You can refer to the type by the short name `foo` or the full name `actypes::foo` in most Hyperbole APIs.
+  </Accordion>
+
+  <Accordion title="Hooking into type creation">
+    `htype-create-hook` runs after every `defact` (and `defib`) call. Use it to log, audit, or react to new type registrations:
+
+    ```emacs-lisp
+    (add-hook 'htype-create-hook
+              (lambda () (message "New Hyperbole type registered")))
+    ```
+  </Accordion>
+</AccordionGroup>

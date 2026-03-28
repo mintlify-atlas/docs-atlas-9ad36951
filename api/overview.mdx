@@ -1,0 +1,119 @@
+---
+title: "API Overview"
+description: "An introduction to the GNU Hyperbole programming API: key files, naming conventions, and where to start."
+---
+
+GNU Hyperbole exposes a well-structured Elisp API for creating and manipulating buttons, defining new action and implicit button types, and integrating with the broader Emacs environment. Nearly all programmable behavior is reachable through a small set of focused files.
+
+## Key API files
+
+The following files form the core of the Hyperbole application programming interface, as documented in the [MANIFEST](https://git.savannah.gnu.org/cgit/hyperbole.git/tree/MANIFEST):
+
+<AccordionGroup>
+  <Accordion title="hbut.el — button constructs (main API)">
+    The primary entry point for working with buttons programmatically. Defines the `ebut`, `ibut`, `gbut`, and `hbut` class functions, the `hattr` attribute accessor family, and the `defib` macro for creating implicit button types. Most button creation, retrieval, activation, and deletion operations are here.
+  </Accordion>
+  <Accordion title="hact.el — button action handling">
+    Defines the `defact` macro for creating named action types, the `hact` function for calling action types programmatically, the `actype` class functions, and the internal `symtable` and `symset` structures that track registered types at runtime.
+  </Accordion>
+  <Accordion title="hargs.el — user input functions">
+    Provides functions for reading user input with type-specific completion, including `hargs:read`, `hargs:read-match`, and `hargs:delimited`. Used by action types and button creation commands to prompt for arguments interactively.
+  </Accordion>
+  <Accordion title="hbmap.el — button map maintenance">
+    Maintains the per-directory map of locations that contain explicit buttons. Used for queries and lookups across all files containing buttons. Provides `hbmap:dir-list` and related utilities.
+  </Accordion>
+  <Accordion title="hbdata.el — button attribute accessor functions">
+    Low-level storage layer for explicit button attributes. Reads and writes per-directory `.hypb` (or `_hypb` on Windows) data files. Functions include `hbdata:get-entry`, `hbdata:write`, `hbdata:delete-entry`, and accessors for individual fields such as `hbdata:actype`, `hbdata:args`, and `hbdata:creator`.
+  </Accordion>
+  <Accordion title="hpath.el — path handling utilities">
+    Provides functions for resolving, normalizing, validating, and displaying file paths and URLs. Key functions include `hpath:find`, `hpath:find-noselect`, `hpath:at-p`, `hpath:is-p`, `hpath:display-buffer`, and `hpath:substitute-var`. Also handles remote paths and Tramp integration.
+  </Accordion>
+  <Accordion title="hypb.el — miscellaneous support features">
+    Miscellaneous utilities used throughout Hyperbole, including `hypb:error` for signaling errors, `hypb:buffer-file-name` for buffer file resolution, `hypb:eval` for safe expression evaluation, and `hypb:configuration` for generating system configuration output.
+  </Accordion>
+  <Accordion title="hui.el — user interface functions">
+    Standard Emacs user interface for Hyperbole. Provides interactive commands for creating and editing explicit buttons (`hui:ebut-create`, `hui:ebut-edit`), global buttons (`hui:gbut-create`, `hui:gbut-edit`), and implicit buttons (`hui:ibut-create`, `hui:ibut-edit`). Also provides `hui:key-src` and `hui:key-dir` for determining button source context.
+  </Accordion>
+</AccordionGroup>
+
+## Naming conventions
+
+Hyperbole follows consistent naming conventions across its source files and public symbols:
+
+| Convention | Meaning |
+|---|---|
+| Files begin with `h` | All Hyperbole source files (e.g., `hbut.el`, `hact.el`, `hpath.el`) |
+| Files in `kotl/` begin with `k` | Koutliner-specific files (e.g., `kotl/kview.el`, `kotl/klink.el`) |
+| Files begin with `hui-` or `hmouse-` | User interface and mouse driver files |
+| Files begin with `hib-` | Files defining specific implicit button types (e.g., `hib-kbd.el`, `hib-social.el`) |
+| Files begin with `hsys-` | Encapsulations of foreign systems (e.g., `hsys-org.el`, `hsys-www.el`) |
+| Functions use `class:method` style | Public functions are named `class:method`, e.g., `hbut:act`, `ebut:create`, `ibut:at-p` |
+| Private symbols use `class::method` | The `::` separator marks internal type namespaces like `actypes::` and `ibtypes::` |
+
+## Getting started
+
+<Steps>
+  <Step title="Load Hyperbole">
+    Hyperbole must be initialized before any API calls are made. The standard way is via `(require 'hyperbole)` or through `package-initialize` if installed from ELPA.
+
+    ```emacs-lisp
+    (require 'hyperbole)
+    ```
+  </Step>
+  <Step title="Find or create a button">
+    Use `hbut:at-p` to check whether point is on any button, or `ebut:at-p` / `ibut:at-p` for type-specific checks. To create an explicit button programmatically, use `ebut:program`.
+
+    ```emacs-lisp
+    ;; Check if there is a button at point
+    (hbut:at-p)
+
+    ;; Create an explicit button programmatically
+    (ebut:program "My Button" 'link-to-file "/path/to/file.org")
+    ```
+  </Step>
+  <Step title="Activate a button">
+    Use `hbut:act` to activate the button at point (or a button symbol retrieved with `hbut:get`).
+
+    ```emacs-lisp
+    ;; Activate the button at point
+    (hbut:act)
+
+    ;; Retrieve and activate a named button
+    (let ((but (hbut:get (hbut:label-to-key "My Button"))))
+      (when but (hbut:act but)))
+    ```
+  </Step>
+  <Step title="Define new types">
+    Use `defact` to define a new named action type, and `defib` to define a new implicit button type that triggers automatically when point is on matching text.
+
+    ```emacs-lisp
+    ;; A new action type
+    (defact my-action (arg)
+      "Perform my custom action with ARG."
+      (message "Activated with: %s" arg))
+
+    ;; A new implicit button type
+    (defib my-ibtype ()
+      "Match TODO: lines and show a message."
+      (when (looking-at "TODO: \\(.+\\)")
+        (ibut:label-set (match-string 0)
+                        (match-beginning 0)
+                        (match-end 0))
+        (hact 'message "Found: %s" (match-string 1))))
+    ```
+  </Step>
+</Steps>
+
+## Explore the API
+
+<CardGroup cols={2}>
+  <Card title="Button API" icon="circle-dot" href="/api/button-api">
+    Core functions for creating, retrieving, activating, and deleting explicit, implicit, and global buttons.
+  </Card>
+  <Card title="Action Types" icon="bolt" href="/api/action-types">
+    The `defact` macro and the full set of built-in action types available in `hactypes.el`.
+  </Card>
+  <Card title="Implicit Button Type API" icon="wand-magic-sparkles" href="/api/implicit-button-types">
+    The `defib` macro and how to define custom implicit button types that match text patterns at point.
+  </Card>
+</CardGroup>

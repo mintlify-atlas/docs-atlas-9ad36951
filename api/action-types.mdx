@@ -1,0 +1,355 @@
+---
+title: "Action Types"
+description: "Named Elisp functions that implement button behaviors: the defact macro, the hact function, and the full set of built-in action types."
+---
+
+An **action type** (actype) is a named Elisp function registered in Hyperbole's internal type system. When a Hyperbole button is activated, its stored `actype` symbol is looked up and called with the button's stored `args`. Action types can also be called directly at any time using the `hact` function.
+
+Action types are defined in `hact.el` (the `defact` macro and `hact` function) and `hactypes.el` (the built-in types).
+
+## Defining action types with defact
+
+```emacs-lisp
+(defmacro defact (type params doc &rest default-action))
+```
+
+`defact` creates a new Hyperbole action type. It is syntactically identical to `defun` but registers the function in the `actypes` symbol table so Hyperbole can look it up by short name as well as by the full `actypes::name` Elisp symbol.
+
+<ParamField path="type" type="symbol">
+  An unquoted symbol naming the action type. Accessible afterwards as both `type` and `actypes::type`.
+</ParamField>
+<ParamField path="params" type="list">
+  Parameter list, exactly as for `defun`. May include `&optional` and `&rest`.
+</ParamField>
+<ParamField path="doc" type="string">
+  Documentation string. Required (unlike `defun`).
+</ParamField>
+<ParamField path="default-action" type="forms">
+  One or more Lisp forms that make up the action body.
+</ParamField>
+
+```emacs-lisp
+;; Define a custom action type
+(defact my-grep (pattern directory)
+  "Run grep for PATTERN recursively in DIRECTORY and display results."
+  (grep (format "grep -rn %s %s" (shell-quote-argument pattern)
+                (shell-quote-argument directory))))
+
+;; Use it in an explicit button
+(ebut:program "Find TODO" 'my-grep "TODO" "~/projects/")
+
+;; Or call it directly
+(hact 'my-grep "FIXME" "~/src/")
+```
+
+<Tip>
+`defact` is aliased as `actype:create`. You can use either name. The full Elisp symbol for a type named `foo` is `actypes::foo`.
+</Tip>
+
+## Calling action types with hact
+
+```emacs-lisp
+(defun hact (&rest args))
+```
+
+Perform the action formed from `args`, where the first element is an action type symbol or name and the remaining elements are its arguments. The actual dispatch goes through `hrule:action`, which defaults to `actype:act`. Returns the action's result, or `t` when the result would be `nil` (so implicit button types can confirm that an action ran).
+
+```emacs-lisp
+;; Call a built-in action type
+(hact 'link-to-file "/path/to/file.el")
+(hact 'link-to-file-line "/path/to/file.el" 42)
+(hact 'eval-elisp '(message "Hello from Hyperbole"))
+(hact 'www-url "https://www.gnu.org/software/hyperbole/")
+
+;; Call a custom action type
+(hact 'my-grep "TODO" "~/projects/")
+```
+
+<Note>
+`hact` sets `hbut:current`'s `actype` attribute to the resolved action type before dispatching. This is important for implicit button type detection: the type framework checks this attribute to confirm that an action ran.
+</Note>
+
+## actype utility functions
+
+| Function | Description |
+|---|---|
+| `(actype:action actype)` | Return the function body for `actype`. If it is already a bound symbol, return it directly. |
+| `(actype:act actype &rest args)` | Perform the action for `actype` with `args`. Returns result or `t`. Runs `action-act-hook`. |
+| `(actype:doc but &optional full)` | Return the first line of the action doc for button `but`. With `full`, return the full docstring. |
+| `(actype:params actype)` | Return the full parameter list for `actype`, including `&optional` keywords. |
+| `(actype:param-list actype)` | Return only the actual parameter names, excluding `&optional` and `&rest`. |
+| `(actype:delete type)` | Remove an action type from the type registry. |
+| `(actype:elisp-symbol actype)` | Return the full `actypes::name` Elisp symbol for `actype`, or nil if it is not registered. |
+
+To list all currently registered action types:
+
+```emacs-lisp
+(symset:get 'actypes 'symbols)
+;; => (link-to-file link-to-file-line eval-elisp www-url ...)
+```
+
+## Built-in action types
+
+All built-in types are defined in `hactypes.el`.
+
+### File and directory navigation
+
+<AccordionGroup>
+  <Accordion title="link-to-file">
+    ```emacs-lisp
+    (defact link-to-file (path &optional point))
+    ```
+    Display the file at `path`, scrolled to optional `point` (a buffer position). If `point` is given, place it at the top of the window. The permanent, general-purpose file link type.
+
+    ```emacs-lisp
+    (hact 'link-to-file "~/notes/ideas.org")
+    (hact 'link-to-file "~/notes/ideas.org" 2048)
+    ```
+  </Accordion>
+  <Accordion title="link-to-file-line">
+    ```emacs-lisp
+    (defact link-to-file-line (path line-num))
+    ```
+    Display `path` scrolled to `line-num`. `line-num` may be an integer or string. Integrates with `smart-tags-file-path` for tag lookup.
+
+    ```emacs-lisp
+    (hact 'link-to-file-line "~/src/main.c" 87)
+    ```
+  </Accordion>
+  <Accordion title="link-to-file-line-and-column">
+    ```emacs-lisp
+    (defact link-to-file-line-and-column (path line-num col-num))
+    ```
+    Display `path` scrolled to `line-num` with point at `col-num` (0-based).
+
+    ```emacs-lisp
+    (hact 'link-to-file-line-and-column "~/src/main.c" 87 12)
+    ```
+  </Accordion>
+  <Accordion title="link-to-directory">
+    ```emacs-lisp
+    (defact link-to-directory (directory))
+    ```
+    Display `directory` in Dired mode.
+
+    ```emacs-lisp
+    (hact 'link-to-directory "~/projects/")
+    ```
+  </Accordion>
+  <Accordion title="link-to-regexp-match">
+    ```emacs-lisp
+    (defact link-to-regexp-match (regexp n source &optional buffer-p))
+    ```
+    Find the Nth occurrence of `regexp` in `source` (a pathname, or a buffer name/buffer when `buffer-p` is non-nil) and display it at the top of the window.
+
+    ```emacs-lisp
+    (hact 'link-to-regexp-match "^(defun hbut:act" 1 "hbut.el")
+    ```
+  </Accordion>
+  <Accordion title="link-to-string-match">
+    ```emacs-lisp
+    (defact link-to-string-match (string n source &optional buffer-p))
+    ```
+    Find the Nth occurrence of literal `string` in `source` and display it at the top of the window.
+
+    ```emacs-lisp
+    (hact 'link-to-string-match "hbut:max-len" 1 "hbut.el")
+    ```
+  </Accordion>
+  <Accordion title="link-to-buffer-tmp">
+    ```emacs-lisp
+    (defact link-to-buffer-tmp (buffer &optional point))
+    ```
+    Display `buffer` (a name or buffer object) scrolled to `point`. Intended for use within a single session; use `link-to-file` for permanent links.
+
+    ```emacs-lisp
+    (hact 'link-to-buffer-tmp "*scratch*")
+    (hact 'link-to-buffer-tmp (current-buffer) (point))
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Info manual navigation
+
+<AccordionGroup>
+  <Accordion title="link-to-Info-node">
+    ```emacs-lisp
+    (defact link-to-Info-node (string))
+    ```
+    Display an Info node specified by `string` in `"(filename)nodename"` or `"filename.info#nodename"` format. Falls back to an index item search if the exact node is not found.
+
+    ```emacs-lisp
+    (hact 'link-to-Info-node "(hyperbole)Buttons")
+    (hact 'link-to-Info-node "(emacs)Files")
+    ```
+  </Accordion>
+  <Accordion title="link-to-Info-index-item">
+    ```emacs-lisp
+    (defact link-to-Info-index-item (index-item))
+    ```
+    Display an Info index cross-reference. `index-item` must be a string in `"(filename)item-name"` format.
+
+    ```emacs-lisp
+    (hact 'link-to-Info-index-item "(hyperbole)hbut:act")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Koutliner cell links
+
+<AccordionGroup>
+  <Accordion title="link-to-kcell">
+    ```emacs-lisp
+    (defact link-to-kcell (file cell-ref))
+    ```
+    Display `file` (a `.kotl` Koutline file) with the cell given by `cell-ref` at the window top. `cell-ref` formats are described in `kcell:ref-to-id`. If `file` is nil, use the current buffer; if `cell-ref` is nil, show the first cell.
+
+    ```emacs-lisp
+    (hact 'link-to-kcell "~/notes/project.kotl" "1.2.3")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Emacs Lisp evaluation
+
+<AccordionGroup>
+  <Accordion title="eval-elisp">
+    ```emacs-lisp
+    (defact eval-elisp (lisp-expr))
+    ```
+    Evaluate `lisp-expr` for its side-effects and return its value. `lisp-expr` should be a quoted Lisp form.
+
+    ```emacs-lisp
+    (hact 'eval-elisp '(hyperbole-mode 1))
+    (hact 'eval-elisp '(message "Hyperbole version: %s" hyperb:version))
+    ```
+  </Accordion>
+  <Accordion title="exec-kbd-macro">
+    ```emacs-lisp
+    (defact exec-kbd-macro (kbd-macro &optional repeat-count))
+    ```
+    Execute `kbd-macro` (a string of editor command characters, a function symbol, or `nil` for the last defined macro) `repeat-count` times. `repeat-count` of `0` repeats until an error.
+
+    ```emacs-lisp
+    (hact 'exec-kbd-macro "M-x tetris RET")
+    (hact 'exec-kbd-macro [?\C-x ?\C-s] 1)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Web and mail
+
+<AccordionGroup>
+  <Accordion title="www-url">
+    ```emacs-lisp
+    (defact www-url (url))
+    ```
+    Open `url` in the default browser. Defined in `hsys-www.el` and declared in `hbut.el`.
+
+    ```emacs-lisp
+    (hact 'www-url "https://www.gnu.org/software/hyperbole/")
+    ```
+  </Accordion>
+  <Accordion title="link-to-compose-mail">
+    ```emacs-lisp
+    (defact link-to-compose-mail (to &optional subject body))
+    ```
+    Open a mail composition buffer addressed to `to` with optional `subject` and `body`.
+
+    ```emacs-lisp
+    (hact 'link-to-compose-mail "bob@gnu.org" "Hyperbole question")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Hyperbole self-referential types
+
+<AccordionGroup>
+  <Accordion title="hyp-config">
+    ```emacs-lisp
+    (defact hyp-config (&optional out-buf))
+    ```
+    Insert Hyperbole configuration information (versions, settings, load path, etc.) at the end of the current buffer, or into `out-buf` if given.
+
+    ```emacs-lisp
+    (hact 'hyp-config)
+    ```
+  </Accordion>
+  <Accordion title="hyp-source">
+    ```emacs-lisp
+    (defact hyp-source (buf-str-or-file))
+    ```
+    Display a buffer or file from a line beginning with `hbut:source-prefix`. Used in button report buffers to navigate back to source locations.
+  </Accordion>
+  <Accordion title="man-show">
+    ```emacs-lisp
+    (defact man-show (topic))
+    ```
+    Display the man page for `topic` in an Emacs buffer using the `man` command.
+
+    ```emacs-lisp
+    (hact 'man-show "grep")
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Button cross-references
+
+<AccordionGroup>
+  <Accordion title="link-to-ebut">
+    ```emacs-lisp
+    (defact link-to-ebut (key &optional key-file))
+    ```
+    Perform the action of the explicit button identified by `key` in optional `key-file` (defaults to the current buffer's file).
+  </Accordion>
+  <Accordion title="link-to-gbut">
+    ```emacs-lisp
+    (defact link-to-gbut (key &optional _key-file))
+    ```
+    Perform the action of the global button identified by `key`.
+  </Accordion>
+  <Accordion title="link-to-ibut">
+    ```emacs-lisp
+    (defact link-to-ibut (name-key &optional but-src point))
+    ```
+    Activate the implicit button given by `name-key` (the key of its `<[name]>` label), at optional `but-src` and `point`. Point must be on the target implicit button when the button using this action type is created.
+  </Accordion>
+</AccordionGroup>
+
+### Bookmarks and annotations
+
+<AccordionGroup>
+  <Accordion title="link-to-bookmark">
+    ```emacs-lisp
+    (defact link-to-bookmark (bookmark))
+    ```
+    Jump to the Emacs bookmark named `bookmark` using `hpath:display-buffer-function`.
+
+    ```emacs-lisp
+    (hact 'link-to-bookmark "my-project-readme")
+    ```
+  </Accordion>
+  <Accordion title="annot-bib">
+    ```emacs-lisp
+    (defact annot-bib (key))
+    ```
+    Follow an internal reference `key` within an annotated bibliography buffer. Delimiters are square brackets `[key]`. Searches backward from the end of the buffer for `[key]`.
+  </Accordion>
+</AccordionGroup>
+
+## Complete example: custom action type with defact
+
+```emacs-lisp
+;; Define a new action type that opens a GitHub issue URL
+(defact open-github-issue (repo issue-number)
+  "Open GitHub issue ISSUE-NUMBER in REPO (owner/repo format) in a browser."
+  (hact 'www-url
+        (format "https://github.com/%s/issues/%s" repo issue-number)))
+
+;; Use it to create a button
+(ebut:program "Hyperbole #42" 'open-github-issue
+              "rswgnu/hyperbole" "42")
+
+;; Or call it directly
+(hact 'open-github-issue "rswgnu/hyperbole" "42")
+```

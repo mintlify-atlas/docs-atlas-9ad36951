@@ -1,0 +1,114 @@
+{
+  "projectType": "general",
+  "projectName": "GNU Hyperbole",
+  "projectDescription": "A powerful, programmable hypertextual information management system for GNU Emacs, providing smart hyperbuttons, a hierarchical outliner, contact manager, wiki note-taking, and window control.",
+  "theme": "maple",
+  "primaryColor": "#fc0434",
+  "lightColor": "#fc7494",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/buttons",
+              "concepts/smart-keys",
+              "concepts/implicit-buttons"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/hywiki",
+              "features/koutliner",
+              "features/hyrolo",
+              "features/hycontrol"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/settings",
+              "configuration/key-bindings",
+              "configuration/button-types"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/org-mode",
+              "integrations/mail",
+              "integrations/xref-consult"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Developer Guide",
+        "groups": [
+          {
+            "group": "Programming API",
+            "pages": [
+              "api/overview",
+              "api/button-api",
+              "api/action-types",
+              "api/implicit-button-types"
+            ]
+          },
+          {
+            "group": "Extending Hyperbole",
+            "pages": [
+              "extending/custom-button-types",
+              "extending/custom-implicit-types",
+              "extending/system-integration"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/key-reference",
+              "reference/faq"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Smart Keys (Action Key & Assist Key) that perform context-sensitive operations across all Emacs modes",
+    "Explicit and implicit hyperbuttons that activate URLs, file paths, grep output, git commits, and more",
+    "HyWiki: markup-free personal wiki with automatic WikiWord hyperlinking using Org mode",
+    "Koutliner: multi-level autonumbered hierarchical outliner with permanent hyperlink anchors",
+    "HyRolo: hierarchical contact manager and fast full-text record search system",
+    "HyControl: interactive window and frame sizing, moving, and management with single keystrokes",
+    "Global buttons accessible anywhere across a user's network of documents",
+    "Programmable button types written in Emacs Lisp for custom hypertext behaviors"
+  ],
+  "publicApiSurface": [
+    "hyperbole-mode — Global minor mode to enable/disable all Hyperbole features",
+    "hbut:create — Create an explicit hyperbutton",
+    "hbut:activate — Activate a Hyperbole button at point",
+    "hact — Execute a Hyperbole action type",
+    "defib — Define a new implicit button type",
+    "defact — Define a new action type",
+    "hyrolo-fgrep — Fast grep search across HyRolo files",
+    "hyrolo-grep — Regexp search across HyRolo files",
+    "hywiki-mode — Global minor mode for HyWiki word highlighting",
+    "hycontrol-enable-windows-mode — Enable interactive window control",
+    "hycontrol-enable-frames-mode — Enable interactive frame control",
+    "kotl-mode — Major mode for Koutliner documents",
+    "hui:ebut-create — Interactively create an explicit button",
+    "hmouse-install — Install Smart Key mouse bindings"
+  ]
+}

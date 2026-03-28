@@ -1,0 +1,138 @@
+---
+title: "Smart Keys"
+description: "The Action Key and Assist Key are Hyperbole's two context-sensitive keys. They perform different operations depending on what is at point, letting you do the right thing everywhere with a single key."
+---
+
+Smart Keys are the primary way you interact with Hyperbole. There are two of them:
+
+- **Action Key** — performs the primary action for the current context
+- **Assist Key** — performs a secondary or help action for the same context
+
+You do not need to remember dozens of mode-specific key bindings. Press a Smart Key and Hyperbole determines what to do based on the major mode, the minor modes active, and the text at point.
+
+## Key bindings
+
+<Tabs>
+  <Tab title="Keyboard">
+    | Key | Smart Key |
+    |-----|-----------|
+    | `M-RET` | Action Key |
+    | `C-u M-RET` | Assist Key (help / describe) |
+
+    `C-u M-RET` is the standard way to ask "what would the Action Key do here?" before committing to the action. Hyperbole displays a description of the button or context at point without executing it.
+  </Tab>
+  <Tab title="Mouse">
+    | Gesture | Smart Key |
+    |---------|-----------|
+    | `mouse-2` (middle button) | Action Key |
+    | `Shift-mouse-2` | Assist Key |
+
+    Clicking with the mouse first moves point to the click position, then runs the Smart Key at that location.
+  </Tab>
+</Tabs>
+
+<Note>
+  All Hyperbole operations, including menu navigation, can be performed from the keyboard alone. The mouse bindings are optional.
+</Note>
+
+## How context dispatch works
+
+Hyperbole maintains a dispatch table called `hkey-alist` in `hui-mouse.el`. Each entry is a cons cell of the form `(predicate . (action-key-form . assist-key-form))`. When you press a Smart Key, Hyperbole evaluates each predicate in order and executes the forms for the first one that returns non-nil.
+
+This means the behavior is always deterministic and inspectable. The ordered list of predicates covers everything from completion frameworks to Dired, Magit, Org mode, Info buffers, and Hyperbole buttons themselves.
+
+## Context behaviors
+
+<Tabs>
+  <Tab title="Action Key">
+    | Context | Action Key behavior |
+    |---------|-------------------|
+    | On a Hyperbole explicit or implicit button | Activates the button |
+    | On a URL (`https://…`, `ftp://…`) | Opens in the default web browser |
+    | On a file path | Opens the file (or directory) |
+    | On a `grep -n` output line | Jumps to the source file at that line |
+    | On a debugger stack frame line | Jumps to the source file at that line |
+    | On a `bug#12345` reference | Queries GNU Debbugs and displays the issue |
+    | On `{key sequence}` in braces | Executes the key sequence |
+    | In `dired-mode` | Visits the file or opens the directory |
+    | In `magit-*` mode | Visits the file diff or commit |
+    | On an Emacs push-button | Activates it |
+    | In the Hyperbole Koutliner (`kotl-mode`) | Performs the Koutliner action at point |
+    | In an xref buffer | Jumps to the source location |
+    | In `occur-mode` / `moccur-mode` | Jumps to the occurrence |
+    | In `view-mode` | Scrolls forward (or quits at end of buffer) |
+    | At end of line (default) | Scrolls the window up (`smart-scroll-up`) |
+    | On an Info node reference like `"(emacs)Files"` | Opens the Info node |
+    | In a Vertico minibuffer | Invokes the Vertico `M-RET` binding |
+    | On an Org link | Follows the link |
+    | No recognized context | Signals an error with a helpful message |
+  </Tab>
+  <Tab title="Assist Key">
+    | Context | Assist Key behavior |
+    |---------|-------------------|
+    | On any Hyperbole button | Displays button attributes and help without activating it |
+    | On a URL | Opens in the web browser (same as Action Key) |
+    | On a file path | Displays file attributes or directory listing |
+    | On a `grep -n` output line | Same jump as Action Key |
+    | On a `bug#12345` reference | Shows subject and current status of the bug |
+    | On `{key sequence}` in braces | Displays documentation for the key sequence |
+    | In `dired-mode` | Shows help for the item at point |
+    | In `magit-*` mode | Runs the Magit assist action |
+    | On an Emacs push-button | Shows help for the button |
+    | At end of line (default) | Scrolls the window down (`smart-scroll-down`) |
+    | In `view-mode` | Scrolls backward |
+    | No recognized context | Signals an error with a helpful message |
+  </Tab>
+</Tabs>
+
+## Describing any context before acting
+
+`C-u M-RET` (or `Shift-mouse-2`) runs the Assist Key and is especially useful for inspecting unfamiliar buttons:
+
+```text
+On an explicit button <(project notes)>:
+  type:     ebut
+  label:    project notes
+  actype:   link-to-file
+  args:     ("~/projects/notes.org")
+  creator:  rsw
+  created:  2024-03-10
+```
+
+This description is shown in a `*HyHelp*` buffer. You can read it and then dismiss it with `q` or activate the button if you are satisfied.
+
+## Customizing default behavior
+
+Two customizable variables control what happens when no specific context is recognized:
+
+```emacs-lisp
+;; What the Action Key does when no context matches (default: signal error)
+(setq action-key-default-function #'hyperbole)
+;; Setting it to #'hyperbole opens the Hyperbole menu instead of erroring
+
+;; What the Assist Key does when no context matches (default: signal error)
+(setq assist-key-default-function #'hkey-summarize)
+;; Setting it to #'hkey-summarize displays a summary of Smart Key contexts
+```
+
+Two more variables control end-of-line behavior:
+
+```emacs-lisp
+;; Action Key at end of line (default: scroll up)
+(setq action-key-eol-function #'smart-scroll-up)
+
+;; Assist Key at end of line (default: scroll down)
+(setq assist-key-eol-function #'smart-scroll-down)
+
+;; To disable end-of-line special behavior entirely:
+(setq action-key-eol-function #'ignore)
+(setq assist-key-eol-function #'ignore)
+```
+
+## Dragging to create buttons
+
+The Action Mouse Key (mouse-2) supports a drag gesture for creating explicit link buttons. Hold mouse-2 down at the source location (where you want the button label to appear), move to the destination window, and release. Hyperbole prompts for a label and creates the button, storing the destination as the link target. No markup language is needed.
+
+<Tip>
+  If you are not sure what a Smart Key will do at a given position, use `C-u M-RET` to inspect the context first. The description always shows the exact action that would be taken.
+</Tip>

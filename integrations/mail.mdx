@@ -1,0 +1,202 @@
+---
+title: "Mail System Integration"
+description: "Embed and activate Hyperbole buttons in email messages using Rmail, MH/mh-e, or GNUS."
+---
+
+Hyperbole can embed hyperbuttons directly into email messages. Recipients with Hyperbole installed can activate those buttons with the Action Key — even in received mail. This makes it possible to send executable links, file references, and structured navigation aids as part of ordinary email.
+
+The integration is built on an abstract mail interface (`hmail.el`) that adapts to whichever Emacs mail reader you use.
+
+---
+
+## The `hmail` abstract interface
+
+`hmail.el` defines the `hmail` class: an abstract layer between Hyperbole and any Emacs-based mail reader or composer. It exposes a set of public variables that other Hyperbole packages use to interact with mail, regardless of which reader is active.
+
+```emacs-lisp
+;; Mode variables set by each mail reader's init function
+(defvar hmail:composer  'message-mode
+  "Major mode for composing mail with Hyperbole buttons.")
+(defvar hmail:lister    nil
+  "Major mode for listing mail header summaries with Hyperbole buttons.")
+(defvar hmail:modifier  nil
+  "Major mode for editing received mail with Hyperbole buttons.")
+(defvar hmail:reader    nil
+  "Major mode for reading mail with Hyperbole buttons.")
+```
+
+Each supported mail reader provides an `init` function (e.g. `Rmail-init`, `Mh-init`) that sets these variables and wires up reader-specific aliases so the rest of Hyperbole can call a uniform interface.
+
+### Choosing your mail reader
+
+Set `hmail:init-function` to tell Hyperbole which mail reader to initialize:
+
+```emacs-lisp
+;; In your Emacs init file, before loading Hyperbole:
+(setq hmail:init-function 'Rmail-init)   ; for Rmail
+;; or
+(setq hmail:init-function 'Mh-init)      ; for MH/mh-e
+```
+
+If initialization fails at startup, run the init function manually:
+
+```text
+M-x Rmail-init   ; initialize Rmail support
+M-x Mh-init      ; initialize MH support
+M-x Gnus-init    ; initialize GNUS support
+```
+
+---
+
+## How buttons in email work
+
+Hyperbole button data is stored in a separate section at the end of a message, separated from the message body by a special delimiter:
+
+```emacs-lisp
+(defvar hmail:hbdata-sep "\^Lbd"
+  "Text separating e-mail msg from any trailing Hyperbole button data.")
+```
+
+When a message is displayed, `hmail:msg-narrow` restricts the buffer view to the message body, hiding the raw button data. The button labels remain visible in the message text; the underlying data is tucked away.
+
+### Activating buttons in received mail
+
+Pressing the Action Key (`M-RET` by default) on a button label in a received message activates it exactly as it would in any other buffer. The Assist Key (`C-u M-RET`) shows what the button will do without activating it.
+
+### Composing mail with buttons
+
+Use `hmail:compose` to open a mail composition buffer pre-populated with button data:
+
+```emacs-lisp
+(hmail:compose "colleague@example.org"
+               '(hact 'link-to-file "/project/design.org"))
+```
+
+To send the entire contents of a buffer as a mail message (with buttons preserved):
+
+```emacs-lisp
+M-x hmail:buffer
+;; Prompts: Include invisible text?
+```
+
+---
+
+## Supported mail readers
+
+<CardGroup cols={3}>
+  <Card title="Rmail" icon="envelope">
+    Emacs's built-in mail reader. Initialize with `Rmail-init` or set `hmail:init-function` to `'Rmail-init`.
+  </Card>
+  <Card title="MH / mh-e" icon="inbox">
+    The MH message handling system via the `mh-e` Emacs frontend. Initialize with `Mh-init` or set `hmail:init-function` to `'Mh-init`.
+  </Card>
+  <Card title="GNUS" icon="newspaper">
+    Emacs's news and mail reader. Also handles Usenet news with Hyperbole buttons. Requires GNUS 3.15 or later.
+  </Card>
+</CardGroup>
+
+---
+
+## Rmail integration (`hrmail.el`)
+
+`hrmail.el` is automatically configured by Hyperbole. It sets up the full abstract interface for Rmail:
+
+```emacs-lisp
+(defun Rmail-init ()
+  "Initialize Hyperbole support for Rmail mail reading."
+  (setq hmail:composer  'mail-mode
+        hmail:lister    'rmail-summary-mode
+        hmail:modifier  'rmail-edit-mode
+        hmail:reader    'rmail-mode)
+  ;; Narrow each message display to its body when shown
+  (var:append 'rmail-show-message-hook '(hmail:msg-narrow))
+  ...)
+```
+
+After initialization, Hyperbole provides these Rmail-specific operations through the abstract interface:
+
+| Abstract name | Rmail function |
+|---|---|
+| `rmail:get-new` | `rmail-get-new-mail` |
+| `rmail:msg-forward` | `rmail-forward` |
+| `rmail:summ-msg-to` | `rmail-summary-goto-msg` |
+| `rmail:summ-new` | `rmail-new-summary` |
+
+<Note>
+If Hyperbole settings fail to load before Rmail initialization, run `{M-x Rmail-init RET}` to initialize support manually.
+</Note>
+
+---
+
+## MH integration (`hmh.el`)
+
+`hmh.el` supports the MH mail system through `mh-e`. After `Mh-init` runs, Hyperbole sets:
+
+```emacs-lisp
+(defun Mh-init ()
+  "Initialize Hyperbole support for Mh mail reading."
+  (setq hmail:composer  'mh-letter-mode
+        hmail:lister    'mh-folder-mode
+        hmail:modifier  'mh-letter-mode
+        hmail:reader    'mh-show-mode)
+  ;; Narrow messages and highlight buttons when shown
+  (var:append 'mh-show-hook '(hmail:msg-narrow Mh-hbut-highlight))
+  ...)
+```
+
+<Note>
+If Hyperbole settings fail to load before MH initialization, run `{M-x Mh-init RET}` to initialize support manually.
+</Note>
+
+---
+
+## GNUS integration (`hgnus.el`)
+
+`hgnus.el` wires Hyperbole into GNUS for both news and mail reading. It sets the news-specific mode variables:
+
+```emacs-lisp
+(setq hnews:composer 'news-reply-mode
+      hnews:lister   'gnus-summary-mode
+      hnews:reader   'gnus-article-mode)
+```
+
+These parallel the `hmail:*` variables and allow Hyperbole to recognize GNUS buffers when composing, listing, and reading news articles.
+
+<Warning>
+GNUS integration requires GNUS version 3.15 or later. Check your version with `{M-ESC gnus-version RET}` before reporting issues.
+</Warning>
+
+<Note>
+If Hyperbole settings fail to load before GNUS initialization, run `{M-x Gnus-init RET}` to initialize support manually.
+</Note>
+
+---
+
+## USENET news variables
+
+Hyperbole also exposes mode variables for USENET news reading, mirroring the mail interface:
+
+```emacs-lisp
+(defvar hnews:composer  'news-reply-mode
+  "Major mode for composing USENET news with Hyperbole buttons.")
+(defvar hnews:lister    'gnus-summary-mode
+  "Major mode for listing USENET news header summaries with Hyperbole buttons.")
+(defvar hnews:reader    'gnus-article-mode
+  "Major mode for reading USENET news with Hyperbole buttons.")
+```
+
+---
+
+## Tips for using hyperlinks in team communications
+
+<Tip>
+**Send file references as buttons.** Instead of copy-pasting a file path, embed a `link-to-file` button in your message body. Recipients with Hyperbole can jump directly to the file with a single keypress.
+</Tip>
+
+<Tip>
+**Use `{C-u M-RET}` before activating.** The Assist Key shows what a button will do without running it — useful when evaluating buttons received from others.
+</Tip>
+
+<Tip>
+**Verify buttons before sending.** Activate your own buttons in the composition buffer before sending to confirm they resolve correctly on your machine. Recipients on different systems may need adjusted paths.
+</Tip>

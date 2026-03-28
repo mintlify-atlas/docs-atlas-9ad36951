@@ -1,0 +1,160 @@
+---
+title: "HyWiki"
+description: "Markup-free personal wiki for note-taking using Org mode, with automatic WikiWord highlighting and hyperlinking."
+---
+
+HyWiki is Hyperbole's personal wiki system for note-taking. It uses Org mode as its file format and requires no markup: simply type a capitalized word and Hyperbole turns it into a live hyperlink automatically.
+
+## What is a HyWikiWord?
+
+A **HyWikiWord** is a capitalized word that:
+
+- Contains only upper and lowercase letters (no digits, hyphens, or underscores)
+- Has at least one uppercase letter after the first character (e.g., `MyNotes`, not `Mynotes`)
+- Has a corresponding `.org` file in `hywiki-directory` (default: `~/hywiki/`)
+
+Examples of valid HyWikiWords: `ProjectIdeas`, `MeetingNotes`, `Emacs`, `JavaScriptTips`.
+
+<Note>
+HyWikiWords require no delimiters. Hyperbole recognizes them in plain text, Org buffers, and (when `hywiki-mode` is enabled) in comments and strings inside programming buffers.
+</Note>
+
+## Enabling HyWiki
+
+HyWikiWords are automatically highlighted and active inside any buffer under `hywiki-directory`. To enable recognition in other buffers, turn on the global minor mode:
+
+```emacs-lisp
+M-x hywiki-mode RET
+```
+
+With `hywiki-mode` active, HyWikiWords are recognized and highlighted in:
+
+- All HyWiki page buffers (always active once Hyperbole is loaded)
+- Non-special text buffers
+- Comments and strings in programming buffers
+
+By default (`hywiki-mode = :pages`), auto-highlighting applies only inside HyWiki pages. Set the mode to `:all` to enable it everywhere.
+
+<Tip>
+If auto-highlighting stops working due to a hook error, restore it with `C-u C-h h h m` to toggle `hywiki-mode`.
+</Tip>
+
+## Creating and navigating pages
+
+<Steps>
+  <Step title="Type a HyWikiWord">
+    Type any capitalized word (e.g., `ProjectIdeas`) in a buffer where HyWiki is active. After you add a trailing space or punctuation, it highlights automatically.
+  </Step>
+  <Step title="Press the Action Key">
+    Place point on a HyWikiWord and press `M-RET` (the Hyperbole Action Key). If the page does not exist, Hyperbole creates `~/hywiki/ProjectIdeas.org` and opens it. If it already exists, it jumps to it.
+  </Step>
+  <Step title="Write your notes">
+    The page is a standard Org file. Use all standard Org mode features: headings, TODO items, tags, tables, and so on.
+  </Step>
+</Steps>
+
+## Linking to sections
+
+You can link to a specific headline within a HyWiki page using a `#` separator.
+
+<Tabs>
+  <Tab title="Without delimiters">
+    ```text
+    Emacs#Major-Modes
+    ```
+    Spaces in section names must be replaced with `-` characters when writing links without delimiters.
+  </Tab>
+  <Tab title="Org link syntax">
+    ```text
+    [[hy:Emacs#Major Modes]]
+    ```
+    Inside double square brackets, spaces in the section name are preserved.
+  </Tab>
+</Tabs>
+
+As long as the page file exists, section links are highlighted regardless of whether the referenced section itself exists. Activating a link to a non-existent section produces an error.
+
+## Org link syntax
+
+HyWiki integrates with Org's standard link format using the `hy:` prefix type:
+
+```text
+[[hy:MyWikiWord]]
+[[hy:Emacs#Major Modes]]
+```
+
+<AccordionGroup>
+  <Accordion title="Removing the hy: prefix requirement">
+    Set `hywiki-org-link-type-required` to `nil` and HyWikiWords work as plain Org links without any prefix:
+
+    ```emacs-lisp
+    (setq hywiki-org-link-type-required nil)
+    ```
+
+    With this setting, `[[ProjectIdeas]]` is treated as a HyWiki link rather than a standard Org file or heading link. Existing HyWiki page names take precedence over Org's default link resolution.
+  </Accordion>
+  <Accordion title="Smart keys and headline creation">
+    To prevent Org mode's `M-RET` binding from splitting lines or creating new headlines when point is on an uncreated HyWikiWord, set:
+
+    ```emacs-lisp
+    (setq hsys-org-enable-smart-keys t)
+    ```
+
+    This lets Hyperbole's Action Key handle `M-RET` correctly in all contexts.
+  </Accordion>
+</AccordionGroup>
+
+## Key variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `hywiki-directory` | `~/hywiki/` | Directory holding all HyWiki `.org` page files |
+| `hywiki-org-link-type-required` | `t` | When `t`, Org links require the `hy:` prefix |
+| `hywiki-exclude-major-modes` | `nil` | List of major modes excluded from HyWikiWord recognition |
+| `hywiki-highlight-all-in-prog-modes` | `(lisp-interaction-mode)` | Programming modes where HyWikiWords are recognized everywhere, not just in comments/strings |
+| `hywiki-org-publishing-directory` | `~/public_hywiki` | Output directory for HTML-exported pages |
+
+## Interactive commands
+
+| Command | Description |
+|---|---|
+| `hywiki-mode` | Toggle HyWiki global minor mode |
+| `hywiki-find-page` | Prompt for a HyWikiWord and open or create its page |
+| `hywiki-find-referent` | Open or create a HyWikiWord page or referent |
+| `hywiki-word-create` | Create or display the page for a HyWikiWord |
+| `hywiki-insert-link` | Insert an Org `[[hy:...]]` link to a HyWikiWord |
+| `hywiki-publish-to-html` | Export all HyWiki pages to HTML using Org publish. With a prefix argument, regenerates all pages. |
+| `hywiki-tags-view` | Show an Org tags view across all HyWiki pages |
+| `hywiki-consult-grep` | Search HyWiki pages with `consult-grep` |
+| `hywiki-consult-backlink` | Find all pages that link to a given HyWikiWord |
+
+## Publishing to HTML
+
+HyWiki pages can be published as a static HTML site using Org's project publishing:
+
+```emacs-lisp
+M-x hywiki-publish-to-html RET
+```
+
+Add a prefix argument (`C-u`) to force regeneration of all pages, not only those modified since the last export. The publish settings are stored in `hywiki-org-publish-project-alist` and are automatically integrated with Org's publishing framework. You can also trigger publishing from inside any HyWiki page with the standard Org command `C-c C-e P p`.
+
+Customize the output location:
+
+```emacs-lisp
+M-x customize-variable RET hywiki-org-publishing-directory RET
+```
+
+## Scalability
+
+HyWiki is built for scale. It has been tested and confirmed performant with **10,000 HyWikiWords**, so it handles large personal wikis without degrading Emacs responsiveness.
+
+## Highlighting behavior
+
+Highlighting occurs dynamically as you type:
+
+- After a trailing whitespace or punctuation character is added following a HyWikiWord
+- When a HyWikiWord is surrounded by a matching pair of delimiters such as `{}` or `[]`
+
+HyWikiWords inside Org's double-bracket links (`[[...]]`) and Org target syntax (`<<...>>`) are intentionally ignored to avoid conflicts with Org's own link handling — unless the `hy:` prefix is present.
+
+Activating a HyWikiWord with the Action Key also highlights all other HyWikiWord instances visible in open Emacs windows.

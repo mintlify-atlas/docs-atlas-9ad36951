@@ -1,80 +1,131 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick Start"
+description: "Get to a working Hyperbole session in minutes: learn the three essential keys, run the interactive demo, and explore the Koutliner and HyControl."
 ---
 
-## Get started in three steps
-
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This guide gets you from a fresh Hyperbole installation to a productive session as quickly as possible. You will learn the three keys you need for everything, then explore the built-in interactive demos.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  This guide assumes Hyperbole is already installed and `hyperbole-mode` is active. If you see `Hypb` in your modeline, you are ready. If not, see the [Installation](/installation) guide first.
 </Note>
+
+## The three essential keys
+
+Everything in Hyperbole flows from three key bindings. Learn these and you can navigate the entire system.
+
+| Key | Name | What it does |
+|---|---|---|
+| `M-RET` | Action Key | Activates whatever is at point: a button, URL, file path, grep line, key sequence, and more |
+| `C-u M-RET` | Assist Key | Shows help for what the Action Key would do at point, without activating it |
+| `C-h h` | Hyperbole menu | Opens the main Hyperbole menu in the minibuffer for keyboard-driven navigation |
+
+<Tip>
+  You can also press `C-h A` (capital A) to preview what the Action Key will do at point. Use this any time you are unsure what `M-RET` will activate.
+</Tip>
+
+## Onboarding flow
+
+<Steps>
+  <Step title="Confirm Hyperbole is active">
+    Press `C-h h`. You should see the Hyperbole menu appear in the minibuffer window at the bottom of your frame. It looks something like:
+
+    ```
+    Hyperbole: Act Butfile Doc Cust Find Gbut Hist Ibut Kotl Msg Rolo Screen Wish
+    ```
+
+    Type the first letter of any item to select it, or press `q` to quit. If the menu does not appear, make sure `(hyperbole-mode 1)` is in your init file and you have restarted Emacs.
+  </Step>
+  <Step title="Try the Action Key on implicit buttons">
+    Open any buffer — a source file, a shell buffer, an email, anything. Move point over one of the following kinds of text and press `M-RET`:
+
+    - A URL (e.g., `https://www.gnu.org/software/hyperbole/`)
+    - A file path (e.g., `~/.emacs`)
+    - A grep output line (e.g., `hbut.el:42: ...`)
+    - A key sequence in braces (e.g., `{C-h h}`)
+    - An email address
+
+    Hyperbole recognizes each pattern and does the right thing automatically: open a browser, visit the file, jump to the source line, execute the key sequence, or compose mail.
+
+    <Tip>
+      If you are unsure what will happen, press `C-u M-RET` first. This runs the Assist Key and describes the action without performing it.
+    </Tip>
+  </Step>
+  <Step title="Run the interactive DEMO">
+    Press `C-h h d d` to open the Hyperbole DEMO file in Emacs. This is an interactive walkthrough of Hyperbole's button capabilities — the fastest way to build muscle memory for the Action Key.
+
+    The DEMO file itself contains dozens of implicit buttons. Press `M-RET` on anything that looks interesting: quoted file paths, brace-delimited key sequences, angle-bracket action buttons, and table entries are all live hyperlinks inside the demo.
+
+    When you are done, press `q` or close the buffer normally.
+  </Step>
+  <Step title="Try the Koutliner demo">
+    Press `C-h h k e` to open an editable copy of Hyperbole's example Koutline file. The Koutliner is Hyperbole's multi-level, autonumbered outliner.
+
+    Inside the Koutliner demo you can:
+
+    - Read the embedded explanations of Koutliner commands
+    - Edit cells and watch autonumbers update automatically
+    - Move subtrees and observe the permanent cell IDs stay attached
+
+    See the [Koutliner](/features/koutliner) page for a full command reference.
+  </Step>
+  <Step title="Try HyControl window management">
+    Press `C-h h s w` to enter HyControl window control mode. HyControl gives you single-key commands to resize, move, and arrange your Emacs windows and frames.
+
+    While in window control mode:
+
+    - Arrow keys and other single keys adjust window sizes and positions
+    - Press `t` to switch between window control and frame control
+    - Press `q` to exit HyControl and return to normal editing
+
+    You can also press `C-c \` at any time (if Hyperbole bound it during startup) to jump directly into HyControl window control.
+
+    For frame control instead, press `C-h h s f`.
+  </Step>
+</Steps>
+
+## Key binding reference
+
+The most important Hyperbole key bindings at a glance:
+
+| Key | Command | Description |
+|---|---|---|
+| `M-RET` | Action Key | Activate button or implicit button at point |
+| `C-u M-RET` | Assist Key | Describe what Action Key would do at point |
+| `C-h A` | `hkey-help` | Describe Action Key context (same as Assist Key) |
+| `C-h h` | `hyperbole` | Open the Hyperbole main menu |
+| `C-h h d d` | Demo | Launch the interactive DEMO |
+| `C-h h d a` | About | Display the HY-ABOUT file |
+| `C-h h d i` | Info | Browse the Hyperbole manual in Info format |
+| `C-h h k e` | Koutliner example | Open the Koutliner demo/example file |
+| `C-h h s w` | Screen → Windows | Enter HyControl window control mode |
+| `C-h h s f` | Screen → Frames | Enter HyControl frame control mode |
+| `C-h h b p` | Personal button file | Open your global button file for editing |
+| `C-h h g a` | Global button activate | Activate a named global button by name |
+| `C-h h e c` | Explicit button create | Create an explicit button at point |
+| `C-h h i l` | Implicit link create | Create an implicit link button between two windows |
+| `C-h h f` | Find menu | Open the Find/Web search menu |
+| `C-c \` | HyControl (quick) | Jump to HyControl window control (if bound) |
+| `C-c @` | Window grid | Create a grid of windows from recent buffers |
+
+<Note>
+  All Hyperbole menu commands are accessible from the keyboard via `C-h h` followed by the first letter of each submenu item. You can also invoke any command interactively with `M-x` using its full name.
+</Note>
+
+## Exploring further
+
+Once you are comfortable with the Action Key and the main menu, explore Hyperbole's subsystems:
+
+<CardGroup cols={2}>
+  <Card title="Buttons & Smart Keys" icon="computer-mouse" href="/concepts/buttons">
+    Learn the difference between explicit, global, and implicit buttons, and how to create your own.
+  </Card>
+  <Card title="HyWiki" icon="book" href="/features/hywiki">
+    Set up a markup-free personal wiki where WikiWords automatically become hyperlinks.
+  </Card>
+  <Card title="Koutliner" icon="list-tree" href="/features/koutliner">
+    Master multi-level autonumbered outlines with permanent hyperlink anchors on every node.
+  </Card>
+  <Card title="HyRolo" icon="address-book" href="/features/hyrolo">
+    Manage contacts and any hierarchical records with fast full-text search.
+  </Card>
+</CardGroup>

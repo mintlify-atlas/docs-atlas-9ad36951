@@ -1,0 +1,320 @@
+---
+title: "Key reference"
+description: "Complete reference of Hyperbole key bindings organized by mode and context."
+---
+
+<Note>
+Key notation follows standard Emacs conventions: `C-` means Control, `M-` means Meta (usually Alt or Escape), and `RET` means Return/Enter. Keys shown as `{C-h h}` in Hyperbole documentation are brace-delimited and can be pressed directly with the Action Key if Hyperbole is active.
+</Note>
+
+## Global keys
+
+These keys are available whenever `hyperbole-mode` is active.
+
+| Key | Description |
+|-----|-------------|
+| `M-RET` | Action Key — context-sensitive action in the current buffer |
+| `C-u M-RET` | Describe what the Action Key will do without activating it |
+| `M-<mouse-2>` | Action Mouse Key — same as Action Key, triggered by mouse |
+| `C-h h` | Open the Hyperbole main menu in the minibuffer |
+| `M-x hyperbole RET` | Open the Hyperbole main menu |
+| `C-c \` | Open HyControl window control (if not previously bound) |
+
+## Hyperbole main menu
+
+Press `C-h h` to open the Hyperbole minibuffer menu, then type the first letter of each item to navigate. Press `q` to quit.
+
+| Key | Menu item | Description |
+|-----|-----------|-------------|
+| `b` | Buttons | Button operations submenu |
+| `d` | Demo | Interactive demonstrations |
+| `f` | Find | Find/web search submenu |
+| `k` | Koutliner | Koutliner operations |
+| `m` | Msg | Toggle messaging button support |
+| `r` | Rolo | HyRolo contact manager |
+| `s` | Screen | HyControl screen/window/frame control |
+| `u` | UsersGuide | Browse the Hyperbole Info manual |
+| `q` | quit | Quit the menu |
+
+### Demo submenu (`C-h h d`)
+
+| Key sequence | Description |
+|--------------|-------------|
+| `C-h h d d` | Run the interactive Hyperbole button capabilities demo |
+| `C-h h d i` | Browse the Hyperbole Info manual |
+| `C-h h d k` | Run the interactive Koutliner demo |
+| `C-h h d v` | Display the installed Hyperbole version |
+
+### Screen submenu (`C-h h s`)
+
+| Key sequence | Description |
+|--------------|-------------|
+| `C-h h s w` | Start HyControl window control mode |
+| `C-h h s f` | Start HyControl frame control mode |
+
+## Button operations
+
+Access the button submenu with `C-h h b`.
+
+| Key sequence | Description |
+|--------------|-------------|
+| `C-h h b c` | Create an explicit button |
+| `C-h h b e` | Edit an existing explicit button |
+| `C-h h b d` | Delete an explicit button |
+| `C-h h b r` | Rename an explicit button |
+| `C-h h b s` | Search for a button by name |
+| `C-h h b g` | Jump to a global button |
+
+### Mouse button creation
+
+You can also create explicit buttons by dragging with the mouse:
+
+| Drag operation | Result |
+|----------------|--------|
+| Drag between two windows (anywhere to anywhere) | Creates an implicit button link (`ibut`) |
+| Drag from a button/buffer/file menu item between windows | Creates an explicit button link (`ebut`) |
+
+## Smart Key contexts
+
+<Tabs>
+  <Tab title="Hyperbole contexts">
+
+| Context | Action Key | Assist Key |
+|---------|------------|------------|
+| On a minibuffer menu item | Activates item | Shows item help |
+| On an explicit button | Activates button | Shows button help |
+| On an implicit button or path | Activates button/path | Shows button help |
+| Reading argument — 1st press at an arg value | Copies value to minibuffer | Same |
+| Reading argument — 2nd press at an arg value | Uses value as argument | Same |
+| In minibuffer at end of line | Accepts minibuffer argument | Lists completions |
+| In minibuffer before end of line | Deletes rest of argument | Deletes rest of argument |
+| Within a Koutline cell | Collapses and expands | Shows tree properties |
+| Left of a Koutline cell | Creates a klink | Moves a tree |
+| HyRolo match buffer | Edits entries and mails to addresses | Same |
+
+  </Tab>
+  <Tab title="Display control">
+
+| Context | Action Key | Assist Key |
+|---------|------------|------------|
+| Line end, not end of buffer (`smart-scroll-proportional = t`, default) | Makes current line the top line | Makes current line the bottom line |
+| Line end, not end of buffer (`smart-scroll-proportional = nil`) | Scrolls up a windowful | Scrolls down a windowful |
+| End of any Help buffer | Restores screen to previous state | Same |
+| Read-only View Mode | Scrolls up a windowful | Scrolls window down |
+
+  </Tab>
+  <Tab title="Mouse-only">
+
+| Context | Action Key | Assist Key |
+|---------|------------|------------|
+| Drag from thing start or end | Yanks thing at release point | Kills thing and yanks at release |
+| Drag from shared window side or left of scroll bar | Resizes window width | Same |
+| Modeline vertical drag | Resizes window height | Same |
+| Other modeline drag to another window | Replaces destination buffer with source buffer | Swaps window buffers |
+| Drag to a modeline from a button/buffer/file menu item | Displays ref/buffer/file in new window | Swaps window buffers |
+| Drag to a modeline from anywhere else | Displays buffer in new window | Swaps window buffers |
+| Drag between windows from anywhere else | Creates an ibut link | Creates an ebut link |
+| Drag outside of Emacs from a button/buffer/file menu item | Displays ref/buffer/file in a new frame | Moves window to new frame |
+| Drag outside of Emacs from modeline or other window | Clones window to new frame | Moves window to new frame |
+| Horizontal drag in a window | Splits window below | Deletes window |
+| Vertical drag in a window | Splits window side-by-side | Deletes window |
+| Diagonal drag in a window | Saves window configuration | Restores wconfig from ring |
+| Active region exists, click outside region | Yanks region at release | Kills and yanks at release |
+
+### Modeline clicks
+
+| Context | Action Key | Assist Key |
+|---------|------------|------------|
+| Left modeline edge | Buries current buffer | Unburies bottom buffer |
+| Right modeline edge | Displays GNU Info manuals | Displays Smart Key summary |
+| Buffer ID area | Opens Dired on buffer's directory | Displays next buffer |
+| Other blank modeline area | Action Key modeline hook (shows/hides Buffer Menu) | Assist Key modeline hook (pops up Screen & Jump Menus) |
+
+  </Tab>
+  <Tab title="Special modes">
+
+| Context | Action Key | Assist Key |
+|---------|------------|------------|
+| Region active | Yanks region at release | Kills and yanks at release |
+| Company Mode completion | Displays definition | Displays documentation |
+| Helm completion | Displays item | Same |
+| Emacs push button | Activates button | Shows button help |
+| Emacs regression test definition | Evaluates and runs test | Edebug and runs test |
+| Thing begin or end | Marks thing region | Marks and kills thing region |
+| Flymake linter mode | Jumps to issue at point | Displays issue at point |
+| Page directory listing | Jumps to page | Same |
+| C, C++, Objective-C, Java modes | Jumps to identifier/include definition | Jumps to next definition |
+| Assembly language mode | Jumps to identifier/include definition | Jumps to next definition |
+| JavaScript and Python modes | Jumps to identifier definition | Jumps to next definition |
+| Any known Lisp or ChangeLog | Jumps to identifier definition | Shows referent documentation |
+| Fortran mode | Jumps to identifier definition | Jumps to next definition |
+| Imenu programming identifier | Jumps to in-buffer definition | Prompts for identifier to jump to |
+| Emacs Lisp compiler error | Jumps to definition with error | Same |
+| Emacs regression test (ERT) | Jumps to definition with error | Same |
+| Other compiler error | Jumps to source error line | Same |
+| Grep or Occur match | Jumps to match source line | Same |
+| Multi-buffer Occur match | Jumps to match source line | Same |
+| Etags `TAGS` file entry | Jumps to source line | Shows button help |
+| Ctags file entry | Jumps to source line | Shows button help |
+| Org Mode | Follows links, cycles headings, and Org Meta Return | — |
+| Org/Roam ID | Jumps to ID referent | Shows button help |
+| Outline major/minor modes | Collapses, expands, and moves outline entries | — |
+| Man Apropos | Displays man page entry | Same |
+| Man pages | Follows cross-refs, file refs, and C code refs | — |
+| I/Buffer Menu | Saves, deletes, and displays buffers | — |
+| Todotxt mode | Toggles item completion | Edits and archives items |
+
+  </Tab>
+  <Tab title="Info reader">
+
+| Context | Action Key | Assist Key |
+|---------|------------|------------|
+| Menu entry or cross reference | Jumps to referent | Same |
+| Up, Next or Prev header | Jumps to referent | Jumps to prior node |
+| File entry of header | Jumps to top node | Jumps to (DIR) node |
+| End of current node | Jumps to next node | Jumps to previous node |
+| Anywhere else | Scrolls up a windowful | Scrolls down a windowful |
+
+  </Tab>
+  <Tab title="Subsystems">
+
+| Context | Action Key | Assist Key |
+|---------|------------|------------|
+| Calendar | Scrolls or shows appointments | Scrolls/marks date |
+| GNU Debbugs tracker | Displays issue discussion | Displays issue status |
+| Treemacs | Displays item | Same |
+| Dired Sidebar | Displays item | Same |
+| Dired mode | Views and deletes files from directory listing | — |
+| Magit modes | Collapses, expands, and jumps to things | — |
+| GNUS news reader | Toggles group subscriptions, gets new news, and browses articles | — |
+| Mail reader and summaries | Browses, deletes, and expunges messages | — |
+| OO-Browser | Browses object classes and elements | — |
+| Tar mode | Views and edits files from tar archive files | — |
+
+  </Tab>
+</Tabs>
+
+## Texinfo cross-references
+
+| Location in cross-reference | Action Key | Assist Key |
+|-----------------------------|------------|------------|
+| Before opening brace | Jumps to Texinfo referent | Shows button help |
+| Within braces | Jumps to Info referent | Shows button help |
+| Menu item or node header | Jumps to Texinfo referent | Shows button help |
+| Include file | Jumps to Texinfo referent | Shows button help |
+| Code/var reference | Displays documentation for referent | Shows button help |
+
+## HyControl window mode
+
+Start HyControl window control with `C-h h s w` or `C-c \`. Press `t` to toggle between window and frame control.
+
+<Tabs>
+  <Tab title="Window control">
+
+| Key | Action |
+|-----|--------|
+| `t` | Toggle to frame control mode |
+| `q` | Quit HyControl |
+| `?` | Display help |
+| `o` | Other window |
+| `b` | Switch to buffer |
+| `d` | Delete window |
+| `D` | Delete other windows (maximize current) |
+| `h` | Split window horizontally (side by side) |
+| `v` | Split window vertically (above/below) |
+| `+` | Enlarge window height by 1 line |
+| `-` | Shrink window height by 1 line |
+| `>` | Enlarge window width by 1 column |
+| `<` | Shrink window width by 1 column |
+| `z` | Zoom (enlarge text) in window |
+| `Z` | Zoom out (shrink text) in window |
+
+  </Tab>
+  <Tab title="Frame control">
+
+| Key | Action |
+|-----|--------|
+| `t` | Toggle to window control mode |
+| `q` | Quit HyControl |
+| `?` | Display help |
+| `o` | Other frame |
+| `d` | Delete frame |
+| `D` | Delete other frames |
+| `+` | Enlarge frame height |
+| `-` | Shrink frame height |
+| `>` | Enlarge frame width |
+| `<` | Shrink frame width |
+| `m` | Move frame to screen corner or edge |
+| `z` | Zoom (enlarge text) in frame |
+| `Z` | Zoom out (shrink text) in frame |
+
+  </Tab>
+</Tabs>
+
+## HyRolo
+
+Start HyRolo with `C-h h r` from the Hyperbole menu.
+
+| Key | Description |
+|-----|-------------|
+| `C-h h r a` | Add a new HyRolo entry |
+| `C-h h r e` | Edit the last matched entry |
+| `C-h h r f` | Find (search) entries by regexp |
+| `C-h h r k` | Kill (delete) an entry |
+| `C-h h r m` | Mail to the e-mail address in an entry |
+| `C-h h r n` | Move to the next entry in match results |
+| `C-h h r p` | Move to the previous entry in match results |
+| `C-h h r s` | Sort entries |
+| `C-h h r t` | Display table of contents |
+| `M-RET` | In a HyRolo match buffer, edit an entry or send mail |
+
+## Koutliner
+
+The Koutliner is an autonumbered hierarchical outliner. Enter it via `C-h h k` or by opening a `.kotl` file.
+
+<Tabs>
+  <Tab title="Navigation">
+
+| Key | Description |
+|-----|-------------|
+| `C-n` | Move to next visible cell |
+| `C-p` | Move to previous visible cell |
+| `M-f` | Move forward one cell at the same level |
+| `M-b` | Move backward one cell at the same level |
+| `C-c C-n` | Move to next cell at any level |
+| `C-c C-p` | Move to previous cell at any level |
+| `M-RET` (on cell) | Collapse or expand cell and subtree |
+| `M-RET` (left of cell) | Create a klink to this cell |
+
+  </Tab>
+  <Tab title="Editing">
+
+| Key | Description |
+|-----|-------------|
+| `C-c C-a` | Add a sibling cell after the current cell |
+| `C-c C-b` | Add a child (branch) cell below the current cell |
+| `C-c C-k` | Kill (cut) the current tree |
+| `C-c C-y` | Yank (paste) a killed tree |
+| `M-<up>` | Move the current tree up past the previous sibling |
+| `M-<down>` | Move the current tree down past the next sibling |
+| `M-<left>` | Promote the current tree (decrease indent level) |
+| `M-<right>` | Demote the current tree (increase indent level) |
+| `C-c C-l` | Add a label/property to the current cell |
+
+  </Tab>
+  <Tab title="View control">
+
+| Key | Description |
+|-----|-------------|
+| `C-c C-o` | Overview: show first line of each cell |
+| `C-c C-e` | Expand all cells fully |
+| `C-c <` | Show only cells up to the given level |
+| `C-c >` | Show cells expanded to the given level |
+| `C-c C-v` | Set the current view specification |
+
+  </Tab>
+</Tabs>
+
+<Info>
+The Koutliner demo is available at `C-h h d k`. It walks you through creating cells, moving trees, and setting view specifications interactively.
+</Info>

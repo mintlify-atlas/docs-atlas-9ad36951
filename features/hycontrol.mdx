@@ -1,0 +1,206 @@
+---
+title: "HyControl"
+description: "Interactive single-key control of Emacs window and frame sizes, positions, and configurations, with face zooming and grid layout support."
+---
+
+HyControl gives you full interactive control of Emacs windows and frames using quick single-key commands. With a few keystrokes you can shift from increasing a window's height by 5 lines, to moving a frame 82 pixels, to snapping a frame to a screen corner — all without leaving the keyboard.
+
+HyControl operates through two coordinated global minor modes that can toggle between each other.
+
+## Starting HyControl
+
+<CardGroup cols={2}>
+  <Card title="Window control" icon="layout-panel-left">
+    `C-h h s w` or `C-c \`
+
+    Manage windows within the current frame: resize, split, delete, move to new frame, and zoom text.
+  </Card>
+  <Card title="Frame control" icon="monitor">
+    `C-h h s f`
+
+    Manage visible frames: resize, move, create, delete, snap to screen edges and corners, and zoom text.
+  </Card>
+</CardGroup>
+
+Once either mode is active, press `t` to toggle to the other mode.
+
+When a HyControl mode is active, a multi-line help summary of available key bindings appears in the minibuffer. The modeline is inverted to signal that HyControl's special key map is in effect.
+
+<Note>
+When called interactively, both modes save the current window or frame configuration automatically. Press `)` at any time to restore it.
+</Note>
+
+## Numeric prefix argument
+
+Most HyControl commands use a numeric prefix argument to determine the amount of change (pixels for frame commands, lines or columns for window commands). You build this argument by typing digits before a command key.
+
+- Type `.` first to reset the argument to 0, then type your number
+- Example: `.5 h` increases window height by 5 lines
+- Example: `.82 <right>` moves the frame 82 pixels to the right
+
+The maximum allowed argument is set by `hycontrol-maximum-units` (default 1000). If you exceed it, the counter resets to the last digit you entered.
+
+Press `C-u` to multiply the current argument by 4, just as in standard Emacs.
+
+## Window mode key bindings
+
+Activate window mode with `C-h h s w` or `C-c \`.
+
+### Resizing windows
+
+| Key | Action |
+|---|---|
+| `h` | Increase window height by N lines |
+| `s` | Decrease window height by N lines |
+| `w` | Increase window width by N columns |
+| `n` | Decrease window width by N columns |
+
+### Creating and deleting windows
+
+| Key | Action |
+|---|---|
+| `[` | Split window vertically (top/bottom) |
+| `]` | Split window horizontally (left/right) |
+| `d` | Delete the selected window |
+| `D` | Delete all other windows (maximize selected) |
+| `f` | Clone window to a new frame (keep original) |
+| `F` | Move window to a new frame (remove original) |
+
+### Navigating windows and frames
+
+| Key | Action |
+|---|---|
+| `I` | Move focus to the window above (windmove up) |
+| `J` | Move focus to the window to the left |
+| `K` | Move focus to the window to the right |
+| `M` | Move focus to the window below |
+| `o` | Move to the Nth next window |
+| `O` | Move to the Nth next frame |
+
+### Frame resizing (also available in window mode)
+
+| Key | Action |
+|---|---|
+| `i` | Maximize frame height to top screen edge, then shrink width by 50% on successive presses |
+| `j` | Maximize frame width to left screen edge |
+| `k` | Maximize frame width to right screen edge |
+| `m` | Maximize frame height to bottom screen edge |
+| `a` | Cycle frame width through percentages in `hycontrol-frame-widths` |
+| `A` | Cycle frame height through percentages in `hycontrol-frame-heights` |
+
+### Moving the frame
+
+| Key | Action |
+|---|---|
+| `<up>` | Move frame up by N pixels |
+| `<down>` | Move frame down by N pixels |
+| `<left>` | Move frame left by N pixels |
+| `<right>` | Move frame right by N pixels |
+| `c` | Cycle frame through screen edge and corner positions |
+| `p` | Prompt with a virtual numeric keypad for corner/edge placement |
+| Numeric keypad `1`–`9` | Jump frame to screen position matching keypad layout |
+
+### Text (face) zooming
+
+| Key | Action |
+|---|---|
+| `Z` | Enlarge text in the current window by N steps (max 9) |
+| `z` | Shrink text in the current window by N steps (max 9) |
+| `X` | Reset text size to default |
+
+### Configuration and utilities
+
+| Key | Action |
+|---|---|
+| `(` | Save the current window/frame configuration |
+| `)` | Restore the previously saved configuration |
+| `b` | Bury the current buffer |
+| `u` | Unbury the most recently buried buffer |
+| `t` | Toggle to frame control mode |
+| `q` or `Q` | Quit HyControl |
+| `.` | Reset the numeric argument to 0 |
+| `?` | Toggle the minibuffer help display |
+
+## Frame mode key bindings
+
+Activate frame mode with `C-h h s f`. Commands not listed here are the same as in window mode.
+
+### Creating and deleting frames
+
+| Key | Action |
+|---|---|
+| `[` or `]` | Create a new frame (sized like the current frame, offset by `hycontrol-frame-offset`) |
+| `D` | Delete the selected frame |
+| `r` | Raise the current frame |
+| `l` | Lower the current frame |
+| `+` | Toggle frame maximization |
+| `~` | Swap buffers between the current frame and another frame |
+| `=` | Resize all other visible frames to match the current frame's size |
+
+### Moving between frames
+
+| Key | Action |
+|---|---|
+| `I` | Move focus to the frame above (framemove, if installed) |
+| `J` | Move focus to the frame to the left |
+| `K` | Move focus to the frame to the right |
+| `M` | Move focus to the frame below |
+
+### Frame text zooming
+
+| Key | Action |
+|---|---|
+| `Z` | Enlarge text across the entire frame |
+| `z` | Shrink text across the entire frame |
+| `X` | Reset frame text to default size |
+
+## Window grid
+
+In either mode, you can instantly tile the current frame with a grid of windows:
+
+```text
+.26 @
+```
+
+This creates 2 rows of 6 windows (26 = 2 rows × 6 columns). Grids range from 1×1 to 9×9.
+
+The buffers displayed are chosen intelligently:
+
+1. If the current buffer is in Dired, Buffer Menu, or IBuffer mode with marked items, those files fill the first windows.
+2. Remaining windows are filled with recently used buffers matching any predicate in `hycontrol-display-buffer-predicate-list` (default: buffers with attached files).
+3. Any remaining windows receive other recent buffers.
+
+Buffers whose names begin with a space are always excluded.
+
+With a prefix argument of `0`, HyControl prompts for a major mode symbol and prefers buffers in that mode.
+
+<Tip>
+The `@` grid command also works outside HyControl when you are in Dired, Buffer Menu, or IBuffer mode — just supply a prefix argument directly (no leading period).
+</Tip>
+
+## Saving and restoring configurations
+
+HyControl lets you snapshot and restore window or frame layouts:
+
+| Key | Action |
+|---|---|
+| `(` | Save the current window/frame configuration to the history stack |
+| `)` | Restore the most recently saved configuration |
+
+When you invoke `hycontrol-enable-windows-mode` or `hycontrol-enable-frames-mode` interactively, the configuration at that moment is saved automatically, so you can always undo any changes by pressing `)`.
+
+## Screen edge offsets
+
+To prevent frame edges from overlapping system toolbars or taskbars, HyControl respects per-screen offsets specified in `hycontrol-screen-offset-alist`. The default includes offsets for common iMac display sizes. Adjust this variable and call `hycontrol-set-screen-offsets` to apply changes.
+
+## Key customization variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `hycontrol-maximum-units` | `1000` | Maximum allowed numeric argument; resets to last digit if exceeded |
+| `hycontrol-frame-offset` | `(13 . 23)` | X and Y pixel offset for each new frame relative to the current one |
+| `hycontrol-help-flag` | `t` | Show key binding help in the minibuffer while a HyControl mode is active |
+| `hycontrol-invert-mode-line-flag` | `t` | Invert the modeline to indicate HyControl is active |
+| `hycontrol-keep-window-flag` | `nil` | When non-nil, keep the original window when tearing it off to a new frame |
+| `hycontrol-display-buffer-predicate-list` | `(list #'hypb:buffer-file-name)` | Predicates used to select preferred buffers for the window grid |
+| `hycontrol-screen-offset-alist` | Screen-specific | Pixel offsets from each screen edge to keep frames clear of toolbars |

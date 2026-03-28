@@ -1,0 +1,150 @@
+---
+title: "Buttons"
+description: "Hyperbole buttons are the core unit of interaction. Learn about explicit buttons, global buttons, and implicit buttons — and how to create, activate, and describe them."
+---
+
+Hyperbole buttons are clickable objects embedded in text that perform actions: following a link, opening a file, running a shell command, querying a bug tracker, and more. Every button has a **label**, an **action type**, and optional **arguments**. You activate any button with a single key — `M-RET` — regardless of its type.
+
+There are three distinct categories of button.
+
+<AccordionGroup>
+  <Accordion title="Explicit buttons">
+    Explicit buttons are buttons you create yourself. Hyperbole inserts them directly into the buffer text using the delimiters `<(` and `)>`. For example:
+
+    ```text
+    <(project notes)>    <(open shell)>    <(hyperbole demo)>
+    ```
+
+    When you activate an explicit button, Hyperbole looks up its action type and arguments from a companion data file named `.hypb` in the same directory as the buffer's file. On Microsoft Windows the file is named `_hypb`. The button label visible in the buffer is only a reference; the action data lives separately.
+
+    **Button attributes stored in `.hypb`**
+
+    Each explicit button record stores:
+
+    | Attribute | Description |
+    |-----------|-------------|
+    | `lbl-key` | Normalized (downcased) form of the label |
+    | `loc` | File or buffer where the button lives |
+    | `dir` | Directory of the button source |
+    | `actype` | Action type symbol (e.g. `link-to-file`, `exec-shell-cmd`) |
+    | `args` | List of arguments passed to the action type |
+    | `creator` | Login name of the person who created the button |
+    | `create-time` | Timestamp of creation |
+    | `modifier` | Login name of the last editor |
+    | `mod-time` | Timestamp of last modification |
+
+    **Creating an explicit button**
+
+    <Steps>
+      <Step title="Drag between windows">
+        With `hyperbole-mode` active, hold down mouse button 2 (middle mouse) and drag from the location where you want the button to a destination window. Hyperbole prompts for a label and creates both the `<(label)>` text and the `.hypb` entry automatically. No markup language needed.
+      </Step>
+      <Step title="Use a keyboard command">
+        Place point where you want the button and call `hui:ebut-create` — accessible via the Hyperbole menu at `{C-h h b c}`. Hyperbole prompts for a label and then for action arguments.
+      </Step>
+    </Steps>
+
+    <Note>
+      The maximum label length is 200 characters by default, controlled by `hbut:max-len`. Set it to `0` for no limit.
+    </Note>
+
+    **Editing and deleting buttons**
+
+    - To rename a button: `{C-h h b r}` (`hui:ebut-rename`)
+    - To delete a button: `{C-h h b d}` — prompts for confirmation if `hui:hbut-delete-confirm-flag` is non-nil
+    - To list all buttons in the current buffer: `{C-h h b l}`
+
+    **Instance numbers**
+
+    If you create two explicit buttons with the same label, Hyperbole appends `:2`, `:3`, etc. to distinguish them. The separator character is defined by `hbut:instance-sep` (default `:`).
+  </Accordion>
+
+  <Accordion title="Global buttons">
+    Global buttons are explicit buttons stored in your personal `~/.hypb` file rather than a per-directory `.hypb` file. Because they are in your home directory, they are accessible from any buffer anywhere in your file system.
+
+    Use global buttons for actions you want to reach regardless of which file you are editing — for example, opening your notes directory, running a build command, or jumping to a frequently visited file.
+
+    **Creating a global button**
+
+    Use the Hyperbole menu entry for global buttons: `{C-h h b g c}`. Hyperbole writes the button record to `~/.hypb` and lets you place the label reference anywhere you like, or activate it by name alone.
+
+    **Activating by name**
+
+    Because global buttons are identified by label, you can activate one without visiting the file that contains its label:
+
+    ```text
+    {C-h h b g a}   — activate a global button by name
+    ```
+
+    Hyperbole presents a completion list of all global button labels for selection.
+
+    <Tip>
+      Keep a small set of global buttons for your most common workflows. They function as a keyboard-accessible bookmark system that can do far more than simply jump to a location.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="Implicit buttons">
+    Implicit buttons are not created by you. Hyperbole recognizes them automatically by matching text patterns in any buffer, regardless of major mode. Common examples include:
+
+    - `https://www.gnu.org/software/emacs/` — opens in a web browser
+    - `~/projects/notes.org` — opens the file
+    - `grep output: foo.c:42: …` — jumps to `foo.c` line 42
+    - `bug#24568` — displays the GNU debbugs issue
+    - `{C-h f describe-function RET}` — executes the key sequence
+
+    Hyperbole evaluates a priority-ordered list of **implicit button types** (ibtypes) against the text at point to determine which, if any, applies. The first matching type wins.
+
+    Implicit buttons have no visual delimiters. Hyperbole highlights them with a distinct face (`hproperty:ibut-face`) so you can tell them apart from plain text and from explicit buttons.
+
+    See [Implicit Buttons](/concepts/implicit-buttons) for a full description of every built-in type.
+  </Accordion>
+</AccordionGroup>
+
+## How buttons work
+
+All three button categories share a common activation mechanism. When you press the **Action Key** (`M-RET` or mouse-2) on any button:
+
+1. Hyperbole identifies whether point is on an explicit button, a global button, or text matching an implicit button type.
+2. It retrieves the button's action type (`actype`) and its arguments.
+3. It calls the action type function with those arguments.
+
+The action type function is an ordinary Emacs Lisp function registered with `defact`. Examples include `link-to-file`, `link-to-Info-node`, `exec-shell-cmd`, and `www-url`. You can define your own; see the Developer Guide.
+
+## Activating buttons
+
+| Method | Key / gesture |
+|--------|--------------|
+| Action Key (keyboard) | `M-RET` |
+| Action Key (mouse) | `mouse-2` |
+| Activate explicit button by label | `{C-h h b a}` |
+| Activate global button by name | `{C-h h b g a}` |
+
+## Describing buttons
+
+Before activating a button you can always inspect what it will do. This is useful when you receive a file or email with embedded buttons from someone else.
+
+| Method | Key / gesture |
+|--------|--------------|
+| Show what Action Key will do | `C-u M-RET` |
+| Assist Key help (mouse) | `Shift-mouse-2` |
+| Show button attributes | `{C-h h b h}` |
+
+`C-u M-RET` runs the **Assist Key** in help mode: it displays a description of the button at point — its label, action type, arguments, creator, and creation time — without activating it.
+
+## Button delimiters
+
+Explicit buttons use the delimiters defined in `hbut.el`:
+
+```emacs-lisp
+(defconst ebut:label-start "<("
+  "String matching the start of a Hyperbole explicit hyper-button.")
+
+(defconst ebut:label-end   ")>"
+  "String matching the end of a Hyperbole explicit hyper-button.")
+```
+
+So the complete form is always `<(label text)>`. The label may contain spaces and most printable characters; avoid the delimiter characters themselves.
+
+<Note>
+  Implicit buttons have no delimiters. Hyperbole determines their boundaries through pattern matching in the ibtype predicate function.
+</Note>

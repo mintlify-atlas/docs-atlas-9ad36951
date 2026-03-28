@@ -1,0 +1,310 @@
+---
+title: "Implicit Button Type API"
+description: "How to define, register, and customize implicit button types (ibtypes) using defib and related helpers."
+---
+
+An **implicit button type** (ibtype) defines a pattern that Hyperbole recognizes automatically in any buffer. When the Smart Keys are pressed, Hyperbole iterates all registered ibtypes in priority order and calls the first one whose predicate returns non-nil at the current point. No explicit button creation is needed; the matching text in the buffer becomes the button.
+
+Ibtypes are defined with `defib` in `hbut.el`. The built-in types are in `hibtypes.el`.
+
+## How ibtypes work
+
+When the Action Key is pressed, Hyperbole calls each registered ibtype in reverse registration order (last defined = highest priority) until one signals a match by:
+
+1. Calling `ibut:label-set` to record the matched text and its buffer positions.
+2. Calling `hact` with an action type to perform when the button is activated.
+
+If no ibtype matches, Hyperbole falls back to explicit button lookup.
+
+<Info>
+An ibtype that calls `ibut:label-set` but returns nil (because `hact` returned nil) will not be recognized. `hact` always returns at least `t` on success, so this is rarely an issue in practice.
+</Info>
+
+## Priority system
+
+Ibtypes are stored in an ordered set. The registration order determines priority:
+
+- **Last defined = highest priority.** A type defined later will be tried first.
+- Within `hibtypes.el`, types are defined in increasing order of priority: the last `defib` in the file has the highest priority.
+- Types from additional files loaded after `hibtypes.el` (e.g., `hib-kbd.el`, `hib-social.el`) have higher priority still, since they are loaded last.
+
+To inspect the current priority order (highest to lowest):
+
+```emacs-lisp
+(symset:get 'ibtypes 'symbols)
+;; Returns the list in activation order (first element = highest priority)
+```
+
+To reset all ibtype priorities and reload defaults:
+
+```emacs-lisp
+(symset:clear 'ibtypes)
+(load "hibtypes")
+```
+
+## The defib macro
+
+```emacs-lisp
+(defmacro defib (type _params doc at-p &optional to-p style))
+```
+
+`defib` registers a new implicit button type in the `ibtypes` symbol table. It is syntactically similar to `defun` but the parameters are handled differently.
+
+<ParamField path="type" type="symbol">
+  An unquoted symbol naming the ibtype. Accessible as both `type` and `ibtypes::type`.
+</ParamField>
+<ParamField path="_params" type="list">
+  Parameter list — currently ignored. Use `()`.
+</ParamField>
+<ParamField path="doc" type="string">
+  Documentation string describing what text this ibtype recognizes.
+</ParamField>
+<ParamField path="at-p" type="form">
+  The predicate body. A Lisp form evaluated at the current point. Must call `ibut:label-set` and `hact` when a match is found, and return non-nil on match. Must return nil when there is no match.
+</ParamField>
+<ParamField path="to-p" type="form" optional>
+  A form that moves point immediately after the next button of this type in the current buffer and returns `(label start end)`, or nil when none is found.
+</ParamField>
+<ParamField path="style" type="form" optional>
+  A display style specification for button highlighting, most useful when `to-p` is given.
+</ParamField>
+
+<Note>
+`defib` enforces that the `at-p` body includes a call to `ibut:label-set` (or `hsys-org-set-ibut-label`). Omitting this call will cause a compile-time error.
+</Note>
+
+## Key helper functions
+
+### ibut:label-set
+
+```emacs-lisp
+(defun ibut:label-set (label &optional start end))
+```
+
+Record `label` (a string) as the label for the implicit button currently being recognized. `start` and `end` are buffer positions bounding the matched text. This call is **required** inside every `defib` predicate body.
+
+### hact
+
+```emacs-lisp
+(defun hact (&rest args))
+```
+
+Perform the action. The first argument is an action type symbol or function; the rest are its arguments. Inside a `defib` body, `hact` signals to the framework that the button was activated and returns a non-nil value.
+
+### ibtype:elisp-symbol
+
+```emacs-lisp
+(defun ibtype:elisp-symbol (symbol-or-name))
+```
+
+Return the full `ibtypes::name` Elisp symbol for an ibtype given by short name or full symbol, or nil if not registered.
+
+```emacs-lisp
+(ibtype:elisp-symbol 'pathname)      ; => ibtypes::pathname
+(ibtype:elisp-symbol "mail-address") ; => ibtypes::mail-address
+```
+
+### ibtype:act
+
+```emacs-lisp
+(defun ibtype:act (ibtype))
+```
+
+Execute `ibtype`'s recognition predicate in the current context. Returns the result of the `at-p` form.
+
+## Creating a minimal ibtype
+
+<Steps>
+  <Step title="Choose a unique name">
+    Pick a symbol that describes what text the type recognizes. By convention, names are lowercase with hyphens.
+
+    ```emacs-lisp
+    ;; We will create a type named: jira-ticket
+    ```
+  </Step>
+  <Step title="Write the at-p predicate">
+    The predicate must check whether point is on matching text. When it is, call `ibut:label-set` with the matched string and its positions, then call `hact` with the action to perform.
+
+    ```emacs-lisp
+    (when (looking-at "[A-Z]+-[0-9]+")
+      (ibut:label-set (match-string 0)
+                      (match-beginning 0)
+                      (match-end 0))
+      (hact 'www-url
+            (concat "https://jira.example.com/browse/"
+                    (match-string 0))))
+    ```
+  </Step>
+  <Step title="Wrap in defib">
+    ```emacs-lisp
+    (defib jira-ticket ()
+      "When on a Jira ticket reference like PROJ-123, open it in a browser."
+      (when (looking-at "[A-Z]+-[0-9]+")
+        (ibut:label-set (match-string 0)
+                        (match-beginning 0)
+                        (match-end 0))
+        (hact 'www-url
+              (concat "https://jira.example.com/browse/"
+                      (match-string 0)))))
+    ```
+  </Step>
+  <Step title="Test the ibtype">
+    Place point on text matching your pattern (e.g., `PROJ-123`) and press the Action Key (`M-RET` by default), or call:
+
+    ```emacs-lisp
+    (ibut:act 'jira-ticket)
+    ```
+
+    To check whether the ibtype recognizes the text at point:
+
+    ```emacs-lisp
+    (ibut:at-type-p 'jira-ticket)
+    ```
+  </Step>
+</Steps>
+
+## Built-in ibtype examples
+
+These examples from `hibtypes.el` illustrate common patterns.
+
+### mail-address — compose mail to an e-mail address
+
+```emacs-lisp
+(defib mail-address ()
+  "If on an e-mail address, compose mail to that address in another window."
+  (when (let ((case-fold-search t))
+          (or (and (or (null hypb:mail-address-mode-list)
+                       (apply #'derived-mode-p hypb:mail-address-mode-list))
+                   ...)
+              ...))
+    (let ((address (mail-address-at-p)))
+      (when address
+        (ibut:label-set address (match-beginning 1) (match-end 1))
+        (hact 'link-to-compose-mail address)))))
+```
+
+This type illustrates the common pattern: run a helper function (`mail-address-at-p`) that returns a match string when the pattern is found at point, then call `ibut:label-set` with the match positions and `hact` with the appropriate action.
+
+### pathname — open files and directories
+
+```emacs-lisp
+(defib pathname ()
+  "Make a valid pathname at point display the path entry."
+  (unless (or (derived-mode-p 'helm-major-mode) ...)
+    (let* ((orig-path (hpath:delimited-possible-path))
+           (path (hpath:at-p))
+           ...)
+      (when path
+        (apply #'ibut:label-set orig-path (hpath:start-end orig-path))
+        (hact 'link-to-file path)))))
+```
+
+`hpath:at-p` does the heavy lifting of determining whether the text at point is a valid path. The ibtype itself focuses on deciding whether the context is appropriate (not in Dired, not in Helm) and delegating to helper functions.
+
+### org-id — follow Org or Org Roam UUIDs
+
+```emacs-lisp
+(defib org-id ()
+  "Display Org roam or Org node referenced by uuid at point, if any."
+  (when (featurep 'org-id)
+    (let* ((id (thing-at-point 'symbol t))
+           (bounds (when id (bounds-of-thing-at-point 'symbol)))
+           ...)
+      (when (hsys-org-uuid-is-p id)
+        (when (and start end)
+          (ibut:label-set id start end))
+        (hact 'link-to-org-id-marker m)))))
+```
+
+This example shows using `thing-at-point` to extract candidate text, validating it (UUID check), and acting on it.
+
+### hywiki-word — create and display personal wiki pages
+
+```emacs-lisp
+(defib hywiki-word ()
+  "When on a non-existing HyWikiWord, create it and display its referent."
+  (when (hywiki-active-in-current-buffer-p)
+    (let* ((wikiword-start-end (hywiki-highlight-word-get-range))
+           (wikiword (nth 0 wikiword-start-end))
+           (start    (nth 1 wikiword-start-end))
+           (end      (nth 2 wikiword-start-end)))
+      (when wikiword
+        (unless (or (ibtypes::pathname-line-and-column)
+                    (ibtypes::pathname))
+          (ibut:label-set wikiword start end)
+          (hact 'hywiki-word-create-and-display wikiword))))))
+```
+
+This ibtype demonstrates how to call other ibtypes from within a predicate (`ibtypes::pathname`) to yield priority to more specific matchers.
+
+## Using defil for simpler delimited link types
+
+For the common case of buttons delimited by a fixed start and end string, Hyperbole provides the `defil` macro as a shorthand for `defib`:
+
+```emacs-lisp
+(defmacro defil (type start-delim end-delim text-regexp link-expr
+                 &optional start-regexp-flag end-regexp-flag doc))
+```
+
+`defil` generates a `defib` automatically. The matched text between the delimiters is applied to `link-expr` via `replace-match` to produce the button's referent.
+
+```emacs-lisp
+;; Define an ibtype for GitHub issue references: [<owner/repo#123>]
+(defil github-issue "[<" ">]"
+       "\\([^/]+/[^#]+\\)#\\([0-9]+\\)"
+       "https://github.com/\\1/issues/\\2")
+
+;; Now any text of the form [<owner/repo#123>] becomes a clickable button
+;; that opens the corresponding GitHub issue URL.
+```
+
+<Tip>
+`defil` is simpler than `defib` when the entire matching logic is "find text between these delimiters, apply this transformation." Use `defib` directly when you need more control over what constitutes a match.
+</Tip>
+
+## Listing and introspecting ibtypes
+
+```emacs-lisp
+;; List all loaded ibtype names (short names, highest priority first)
+(mapcar #'symbol-name (symset:get 'ibtypes 'symbols))
+
+;; Get the full Elisp symbol for an ibtype
+(ibtype:elisp-symbol 'pathname) ; => ibtypes::pathname
+
+;; Get documentation for an ibtype
+(htype:doc 'ibtypes::pathname)
+
+;; Check whether point is on a specific ibtype
+(ibut:at-type-p 'pathname)
+
+;; Temporarily inhibit all actions (test mode)
+(let ((hrule:action 'actype:identity))
+  (ibut:at-p))
+```
+
+## Complete example: a custom ibtype with to-p
+
+This example defines an ibtype that recognizes `BUG#NNN` references and provides both an action (open a web page) and a `to-p` form for jumping between occurrences:
+
+```emacs-lisp
+(defib my-bug-ref ()
+  "When on a BUG#NNN reference, open the bug tracker page for it."
+  (save-excursion
+    (skip-chars-backward "BUG#0-9")
+    (when (looking-at "BUG#\\([0-9]+\\)")
+      (ibut:label-set (match-string 0)
+                      (match-beginning 0)
+                      (match-end 0))
+      (hact 'www-url
+            (format "https://bugs.example.com/%s"
+                    (match-string 1)))))
+  ;; to-p: move to the next BUG# reference in the buffer
+  (when (re-search-forward "BUG#[0-9]+" nil t)
+    (list (match-string 0)
+          (match-beginning 0)
+          (match-end 0))))
+```
+
+<Note>
+The `to-p` form is the fourth positional argument to `defib` (after `doc` and `at-p`). It is optional; most ibtypes omit it.
+</Note>

@@ -1,0 +1,162 @@
+---
+title: "Installation"
+description: "Install GNU Hyperbole via the Emacs package manager (stable or development), or clone directly from the Savannah Git repository."
+---
+
+Hyperbole installs as a single Emacs package with no dependencies outside of standard Emacs libraries. Choose the method that suits your workflow.
+
+<Note>
+  Hyperbole requires GNU Emacs 28 or above. If you are running an older version, upgrade Emacs first.
+</Note>
+
+## Installation methods
+
+<Tabs>
+  <Tab title="Stable release (GNU Elpa)">
+    The Emacs Package Manager installs the latest stable release of Hyperbole from GNU Elpa. This is the recommended method for most users.
+
+    <Steps>
+      <Step title="Add the install snippet to your init file">
+        Open your personal Emacs initialization file (typically `~/.emacs` or `~/.emacs.d/init.el`) and add the following lines:
+
+        ```emacs-lisp
+        (require 'package)
+        (unless (package-installed-p 'hyperbole)
+          (package-refresh-contents)
+          (package-install 'hyperbole))
+        (hyperbole-mode 1)
+        ```
+
+        Save the file.
+      </Step>
+      <Step title="Restart Emacs">
+        Restart Emacs. Hyperbole will be downloaded from GNU Elpa and byte-compiled for your version of Emacs. This takes a minute or two. You may see byte-compilation warnings in the `*Messages*` buffer — these are safe to ignore and do not affect performance.
+      </Step>
+      <Step title="Verify the installation">
+        After Emacs restarts you should see `Hypb` in the minor-mode section of your modeline and a **Hyperbole** entry in your menubar. Press `C-h h` to bring up the Hyperbole main menu in the minibuffer. Press `q` to quit.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Development snapshot (GNU Elpa-Devel)">
+    The Elpa-Devel package pulls from the tip of the Hyperbole development branch. Because Hyperbole is a mature package, this is generally safe for day-to-day use, but new features under active testing may occasionally break briefly before a fix is pushed.
+
+    Use this method if you want to try new features or submit bug reports against the latest code. Note that you cannot submit pull requests via this method; use the Git clone method for that.
+
+    <Steps>
+      <Step title="Add the Elpa-Devel archive and install snippet">
+        Open your Emacs initialization file and add these lines:
+
+        ```emacs-lisp
+        (require 'package)
+        (add-to-list 'package-archives '("gnu-devel" . "https://elpa.gnu.org/devel/"))
+        (unless (package-installed-p 'hyperbole)
+          (package-refresh-contents)
+          (package-install 'hyperbole))
+        (hyperbole-mode 1)
+        ```
+
+        Save the file.
+      </Step>
+      <Step title="Restart Emacs">
+        Restart Emacs. The package manager will fetch and compile the latest development snapshot from `https://elpa.gnu.org/devel/`. Give it a minute or two. Byte-compilation warnings are safe to ignore.
+      </Step>
+      <Step title="Verify the installation">
+        Press `C-h h` to confirm the Hyperbole menu appears in the minibuffer. The modeline should show `Hypb`.
+      </Step>
+    </Steps>
+  </Tab>
+  <Tab title="Git clone (Straight)">
+    If you prefer to track Hyperbole development between releases and want to try features still in testing — or if you want to submit patches — use the [Straight](https://github.com/raxod502/straight.el) package manager to clone directly from the Savannah Git repository.
+
+    <Steps>
+      <Step title="Bootstrap Straight and install Hyperbole">
+        Add the following to your Emacs initialization file. The first block bootstraps Straight itself; the second block installs Hyperbole from the canonical Git repository at `https://git.savannah.gnu.org/git/hyperbole.git`.
+
+        ```emacs-lisp
+        ;; Bootstrap Straight
+        (progn
+          (when (< emacs-major-version 27)
+            (error "Hyperbole requires Emacs 27 or above; you are running version %d"
+                   emacs-major-version))
+          (defvar bootstrap-version)
+          (setq package-enable-at-startup nil)
+          (let ((bootstrap-file
+                 (expand-file-name "straight/repos/straight.el/bootstrap.el"
+                                   user-emacs-directory))
+                (bootstrap-version 5))
+            (unless (file-exists-p bootstrap-file)
+              (with-current-buffer
+                  (url-retrieve-synchronously
+                   "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+                   'silent 'inhibit-cookies)
+                (goto-char (point-max))
+                (eval-print-last-sexp)))
+            (load bootstrap-file nil 'nomessage)))
+
+        ;; Install Hyperbole from Savannah Git
+        (straight-use-package
+         '(hyperbole
+           :host nil
+           :repo "https://git.savannah.gnu.org/git/hyperbole.git"
+           :config (hyperbole-mode 1)))
+        ```
+
+        Save the file.
+      </Step>
+      <Step title="Restart Emacs">
+        Restart Emacs. Straight will clone the repository and compile Hyperbole without showing byte-compilation warnings. The process takes a minute or two on first run.
+      </Step>
+      <Step title="Verify the installation">
+        Press `C-h h` to confirm the Hyperbole menu appears in the minibuffer. The modeline should show `Hypb`.
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Upgrading an existing installation
+
+If you have Hyperbole 5.10 or higher already installed, upgrade it through the Emacs Package Manager:
+
+<Steps>
+  <Step title="Open the package list">
+    Press `M-x list-packages RET` to open the package manager.
+  </Step>
+  <Step title="Upgrade all out-of-date packages">
+    Press `U` to mark all upgradable packages (including Hyperbole), then press `x` to execute the upgrades. Confirm any prompts.
+  </Step>
+  <Step title="Restart Emacs">
+    Restart Emacs to load the upgraded version. You should see the new version number reflected in `M-x hyperbole-mode RET` or by checking `(hyperb:version)` in `*scratch*`.
+  </Step>
+</Steps>
+
+## Invoking Hyperbole
+
+Once installed and loaded, Hyperbole is immediately active. You can reach it in three ways:
+
+- **Menubar** — a **Hyperbole** menu appears in the Emacs menubar.
+- **Minibuffer menu** — press `C-h h` or `M-x hyperbole RET` to open the Hyperbole main menu in the minibuffer. Select items by typing their first letter. Press `q` to quit.
+- **Direct commands** — use specific bindings such as `M-RET` (the Action Key) directly on any recognized pattern.
+
+<Tip>
+  Press `C-h h d d` to launch the interactive DEMO, the best hands-on introduction to Hyperbole's button capabilities. Press `C-h h k e` to try the Koutliner demo, and `C-h h s w` to enter HyControl window management mode.
+</Tip>
+
+## Browsing the manual
+
+The Hyperbole reference manual is included in the `man/` subdirectory of the package in four formats:
+
+| Format | File | Access |
+|---|---|---|
+| Info (online browser) | `man/hyperbole.info` | `C-h h d i` |
+| HTML (web browser) | `man/hyperbole.html` | Open in browser |
+| PDF (printable) | `man/hyperbole.pdf` | Open in PDF viewer |
+| Texinfo (source) | `man/hyperbole.texi` | Edit in Emacs |
+
+The HTML version is typically located at `~/.emacs.d/elpa/hyperbole-VERSION/man/hyperbole.html` after a package-manager install.
+
+## Browsing the source
+
+To explore Hyperbole's source code online without installing it:
+
+- **Web browser** — visit `https://git.savannah.gnu.org/cgit/hyperbole.git/tree/`
+- **Tarball** — download a stable release archive from `ftp://ftp.gnu.org/gnu/hyperbole/` or a mirror via `http://ftpmirror.gnu.org/hyperbole/`

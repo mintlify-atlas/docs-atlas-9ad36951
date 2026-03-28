@@ -1,0 +1,305 @@
+---
+title: "Implicit buttons"
+description: "Implicit buttons are text patterns that Hyperbole recognizes automatically in any buffer. No creation step is needed — load Hyperbole and your text comes to life."
+---
+
+An **implicit button type** (ibtype) is a named predicate-and-action pair. When you press the Action Key (`M-RET`), Hyperbole evaluates the predicates of each loaded ibtype in priority order against the text at point. The first predicate that succeeds determines the action to take.
+
+You never create implicit buttons explicitly. They appear wherever Hyperbole recognizes their patterns — in source code, shell output, email, documentation, or any other buffer.
+
+## How ibtypes are evaluated
+
+Implicit button types are defined with the `defib` macro (from `hbut.el`). Each type registers a predicate function that:
+
+1. Tests whether point is within text matching the type's pattern.
+2. If so, calls `ibut:label-set` to record the button's label and boundaries.
+3. Calls `hact` with the appropriate action type and arguments.
+
+Hyperbole evaluates ibtypes in **highest-to-lowest priority order**. In `hibtypes.el`, types defined later in the file have higher priority. To list the current priority order from highest to lowest, evaluate:
+
+```emacs-lisp
+(symset:get 'ibtypes 'symbols)
+```
+
+## Built-in implicit button types
+
+The following types are loaded by default. They are listed roughly from lower to higher priority as they appear in `hibtypes.el`.
+
+<AccordionGroup>
+  <Accordion title="HyWiki words">
+    When HyWiki mode is active (`hywiki-mode`), any CamelCase WikiWord in a buffer becomes an implicit button. The Action Key on an existing WikiWord navigates to its page. On a non-existing WikiWord, Hyperbole offers to create the page.
+
+    ```text
+    ProjectNotes   MyJournalEntry   CodeReview
+    ```
+
+    WikiWords are handled by the `hywiki-word` and `hywiki-existing-word` ibtypes. They are suppressed when point is on a recognized pathname.
+  </Accordion>
+
+  <Accordion title="Python tracebacks">
+    Lines from Python tracebacks and ipython stack frames become implicit buttons that jump to the referenced source file and line number.
+
+    ```text
+    File "/home/user/app/main.py", line 42, in process
+    ~/Dropbox/py/inview/inview_pr.py in ap(name_filter, value_filter)
+    ```
+
+    The `debugger-source` ibtype covers Python, JavaScript, GDB, DBX, and HP-UX xdb stack frames and breakpoint lines.
+  </Accordion>
+
+  <Accordion title="Org and Org-Roam IDs">
+    UUIDs that identify Org nodes or Org-Roam nodes become implicit buttons. The Action Key navigates to the referenced node. The Assist Key copies a link to the kill ring.
+
+    ```text
+    9a8b7c6d-5e4f-3a2b-1c0d-ef9a8b7c6d5e
+    id:9a8b7c6d-5e4f-3a2b-1c0d-ef9a8b7c6d5e
+    ```
+
+    Requires the `org-id` feature. Handled by the `org-id` ibtype.
+  </Accordion>
+
+  <Accordion title="Email addresses">
+    Email addresses in buffers whose major mode is listed in `hypb:mail-address-mode-list`, or in any buffer whose name contains "mail" or "rolo", become implicit buttons that compose a new message to that address.
+
+    ```text
+    rsw@gnu.org    user@example.com
+    ```
+
+    The `mail-address` ibtype is controlled by `hypb:mail-address-mode-list`. Setting that variable to `nil` activates the type in all buffers.
+  </Accordion>
+
+  <Accordion title="File paths and pathnames">
+    Valid file paths — whether absolute, relative, remote (Tramp), or Emacs Lisp library names — become implicit buttons that open the path.
+
+    ```text
+    ~/projects/notes.org
+    /etc/hosts
+    ${hyperb:dir}/DEMO
+    hbut.el            (looked up via load-path)
+    (emacs)Files       (Info file reference)
+    ```
+
+    The `pathname` ibtype also handles:
+    - `PATH`-style environment variable names (e.g. `MANPATH`) — prompts you to choose one path from the variable's value
+    - Texinfo `@file{}` entries
+    - Hash-style section anchors in HTML, XML, Markdown, and Org files
+    - Remote pathnames via Tramp
+
+    The related `pathname-line-and-column` ibtype extends this to paths with an explicit line number and optional column, such as those produced by `grep -n`:
+
+    ```text
+    src/hbut.el:82
+    ~/notes.org:L14:C5
+    ```
+  </Accordion>
+
+  <Accordion title="URLs">
+    URLs beginning with `http://`, `https://`, `ftp://`, and other recognized schemes become implicit buttons that open in your default web browser. This is handled by `hsys-www`, loaded as part of `hibtypes.el`.
+
+    ```text
+    https://www.gnu.org/software/hyperbole/
+    ftp://ftp.gnu.org/gnu/hyperbole/
+    ```
+
+    The Action Key calls the `www-url` action type. The Assist Key also opens the URL.
+  </Accordion>
+
+  <Accordion title="Hyperbole manual references">
+    Quoted paths of the form `"hyperbole.html#Smart Keys"` or `"hyperbole.texi#Buttons"` become implicit buttons that display the referenced section of the local Hyperbole HTML manual in a browser, or jump to the node in the Texinfo source.
+
+    ```text
+    "hyperbole.html#Implicit Buttons"
+    "hyperbole.texi#Smart Keys"
+    ```
+
+    Handled by the `hyp-manual` ibtype.
+  </Accordion>
+
+  <Accordion title="Annotated bibliography references">
+    In plain-text (non-programming, non-Markdown, non-Org) buffers with attached files, text in square brackets that begins with a word character and does not contain `@` or `#` becomes an implicit button linking to the corresponding bibliography entry in the same file.
+
+    ```text
+    [Knuth1984]    [RFC822]
+    ```
+
+    Handled by the `annot-bib` ibtype.
+  </Accordion>
+
+  <Accordion title="Org links outside Org mode">
+    Standard Org link syntax (`[[target][description]]` or `[[target]]`) works as an implicit button in any non-Org-mode buffer, invoking `org-open-at-point-global` to follow the link.
+
+    ```text
+    [[file:~/notes.org::*My Heading][My notes]]
+    [[https://example.com]]
+    ```
+
+    Handled by the `org-link-outside-org-mode` ibtype. Org links in Org mode itself are handled at higher priority by the Org integration.
+  </Accordion>
+
+  <Accordion title="Markdown links">
+    In `markdown-mode` buffers, inline links, reference links, wiki links, and footnote markers all become implicit buttons.
+
+    ```text
+    [link text](https://example.com)
+    [reference link][ref-id]
+    [[WikiLink]]
+    [^footnote-ref]
+    ```
+
+    Handled by the `markdown-internal-link` ibtype. URL links within Markdown are also caught by the URL ibtype.
+  </Accordion>
+
+  <Accordion title="Internet RFC references">
+    References to Internet RFCs in the formats `RFC822`, `rfc-822`, or `RFC 822` become implicit buttons that retrieve and display the RFC. The location from which RFCs are fetched is controlled by `hpath:rfc`.
+
+    ```text
+    RFC822    rfc-2822    RFC 7231
+    ```
+
+    Handled by the `rfc` ibtype. In RFC buffers themselves, the `rfc-toc` ibtype makes table-of-contents entries jump to their sections.
+  </Accordion>
+
+  <Accordion title="Grep and compiler output lines">
+    Lines from `grep -n`, ripgrep (`rg`), compilation errors, and many compiler error formats become implicit buttons that jump directly to the referenced source file and line number.
+
+    ```text
+    src/hbut.el:42: (defconst ebut:label-start
+    hbut.el:82:-(defconst ebut:label-start
+    foo.c:10: error: undeclared variable
+    ```
+
+    The `grep-msg` ibtype recognizes patterns from grep, Ruby, UNIX C compiler, HP C compiler, BSO/Tasking, UNIX Shell, Perl, Weblint, Microsoft JVC, SparcWorks, and IBM AIX xlc. The `ripgrep-msg` ibtype handles ripgrep output. The `grep-single-file` ibtype handles single-file grep output where only a line number prefixes each match.
+  </Accordion>
+
+  <Accordion title="Debugger stack frames">
+    Stack frame and breakpoint lines from interactive debuggers become implicit buttons. Supported debuggers include Python `pdb`, JavaScript, GDB, WDB, DBX, and HP-UX xdb.
+
+    ```text
+    File "/home/user/app.py", line 34, in main
+    #0  main () at main.c:10
+    ```
+
+    Handled by the `debugger-source` ibtype.
+  </Accordion>
+
+  <Accordion title="Elisp byte-compiler and ERT messages">
+    Error messages from the Emacs Lisp byte compiler (`*Compile-Log*`), native compiler (`*Async-native-compile-log*`), and ERT test output (`*ert*`) become implicit buttons. The Action Key jumps to the definition of the symbol or file referenced in the message.
+
+    ```text
+    While compiling hbut in file /home/user/.emacs.d/elpa/hyperbole-9.0.2/hbut.el:
+      While compiling ebut:create:
+    ```
+
+    Handled by the `elisp-compiler-msg` ibtype.
+  </Accordion>
+
+  <Accordion title="Texinfo and Info cross-references">
+    In `texinfo-mode` buffers, `@xref{}`, `@pxref{}`, and `@ref{}` constructs become implicit buttons that display the referenced Info node. Menu item lines jump to their section.
+
+    ```text
+    @xref{Implicit Buttons}
+    @pxref{Smart Keys, Smart Keys, , hyperbole}
+    * Buttons::
+    ```
+
+    Info node references of the form `"(filename)nodename"` work in any buffer, including those delimited with `"..."`, `\`...'`, or ` `` ...'' `.
+
+    ```text
+    "(hyperbole)Implicit Buttons"
+    `(emacs)Files'
+    ```
+
+    Handled by the `texinfo-ref` and `Info-node` ibtypes.
+  </Accordion>
+
+  <Accordion title="GNU Debbugs issue references">
+    References to GNU Debbugs issues become implicit buttons. The Action Key opens the original submission message and allows browsing the discussion thread. The Assist Key shows the subject and current status.
+
+    ```text
+    bug#24568
+    bug# 24568
+    bug #24568
+    bug 24568
+    ```
+
+    The words `issue` and `debbugs` work as well as `bug`. Query strings are also supported:
+
+    ```text
+    bug?status=open&package=hyperbole
+    bug#24568?severity=normal
+    ```
+
+    Handled by `hib-debbugs.el`. Requires the third-party `debbugs` Emacs package (version 0.9.7 or higher) to be installed.
+  </Accordion>
+
+  <Accordion title="Emacs key sequences in braces">
+    Any series of Emacs key sequences enclosed in curly braces becomes an implicit button. The Action Key executes the key sequence; the Assist Key displays its documentation.
+
+    ```text
+    {M-x describe-function RET}
+    {C-h h d d}
+    {C-x C-f ~/.emacs RET}
+    ```
+
+    Key sequences must be in human-readable form with spaces between keys. Forms like `{\C-b}` or `{^b}` are not recognized.
+
+    Handled by `hib-kbd.el`.
+  </Accordion>
+
+  <Accordion title="Social media references">
+    References to social media accounts and hashtags in the format `service#tag` or `service@user` become implicit buttons that open the referenced profile or search page in a browser.
+
+    ```text
+    twitter#hyperbole    github@rswgnu
+    ```
+
+    Handled by `hib-social.el`.
+  </Accordion>
+
+  <Accordion title="Koutliner cell links">
+    References to Hyperbole Koutliner cells become implicit buttons that jump to the referenced cell. These are relative or absolute cell address references in Koutline (`.kotl`) files.
+
+    Handled by `klink.el`.
+  </Accordion>
+
+  <Accordion title="Action buttons (angle-bracket expressions)">
+    Text delimited by `<` and `>` that contains a valid Emacs Lisp function call, a Hyperbole action type invocation, or a variable name becomes an implicit button that evaluates or displays it.
+
+    ```text
+    <man-show "grep">
+    <display-variable load-path>
+    ```
+
+    Handled by the `action` ibtype (defined in `hibtypes.el`). This is the highest-priority built-in ibtype.
+  </Accordion>
+</AccordionGroup>
+
+## Priority and ordering
+
+Ibtypes in `hibtypes.el` are defined in **increasing order of priority** — the last definition in the file has the highest priority. At runtime, Hyperbole evaluates them from highest to lowest priority until one succeeds.
+
+```emacs-lisp
+;; To see the current priority order (highest first):
+(symset:get 'ibtypes 'symbols)
+
+;; To reset all ibtype priorities and reload:
+(symset:clear 'ibtypes)
+;; then reload hibtypes.el
+```
+
+When you define your own implicit button types with `defib`, you control their priority relative to built-in types by where and when you load them.
+
+## Defining your own implicit button type
+
+A minimal custom ibtype looks like this:
+
+```emacs-lisp
+(defib my-ticket-ref ()
+  "On a PROJ-123 style ticket reference, open it in the browser."
+  (when (looking-at "\\([A-Z]+-[0-9]+\\)")
+    (let ((ticket (match-string-no-properties 1)))
+      (ibut:label-set ticket (match-beginning 1) (match-end 1))
+      (hact 'www-url (concat "https://issues.example.com/browse/" ticket)))))
+```
+
+After evaluating this definition, pressing `M-RET` on `PROJ-123` in any buffer will open your issue tracker. See the Developer Guide for the full `defib` and `defact` API.

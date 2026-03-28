@@ -1,0 +1,284 @@
+---
+title: "Xref, Consult & Web"
+description: "How Hyperbole integrates with Emacs xref, the consult package, URL browsing, and YouTube action buttons."
+---
+
+Hyperbole extends three external systems — Emacs's built-in `xref` cross-reference framework, the `consult` completion package, and web/URL handling — through dedicated support libraries. Each adds Smart Key awareness or convenience commands on top of the underlying tool.
+
+---
+
+## Xref integration (`hsys-xref.el`)
+
+`hsys-xref.el` provides Hyperbole's interface to Emacs's `xref` cross-reference system. It is used internally by Hyperbole's Smart Key dispatch to resolve identifiers to their definitions.
+
+### How it works
+
+When the Action Key is pressed on an identifier in a programming buffer, Hyperbole calls `hsys-xref-identifier-at-point` to check whether the text under point is a cross-referenceable identifier (and not a pathname, which would be handled by a different implicit button type):
+
+```emacs-lisp
+(defun hsys-xref-identifier-at-point ()
+  "Return the identifier at point if not a pathname; otherwise, return nil."
+  (unless (hpath:at-p)
+    (xref-backend-identifier-at-point (xref-find-backend))))
+```
+
+If an identifier is found, Hyperbole uses `hsys-xref-definitions` to find all its definitions via the active xref backend:
+
+```emacs-lisp
+(defun hsys-xref-definitions (identifier)
+  "Return a list of all definitions of string IDENTIFIER."
+  (let* ((xref-backend (xref-find-backend))
+         (xref-items (xref-backend-definitions xref-backend identifier)))
+    ...))
+```
+
+`hsys-xref-definition` returns the first result:
+
+```emacs-lisp
+(defun hsys-xref-definition (identifier)
+  "Return the first definition of string IDENTIFIER."
+  (car (hsys-xref-definitions identifier)))
+```
+
+### Emacs Lisp special case
+
+In Emacs Lisp buffers, `hsys-xref-definitions` applies extra filtering. When there is more than one definition, it removes `feature` entries, which can otherwise shadow more specific definitions (for example, a `feature` named `eww` shadowing the `eww` function definition):
+
+```emacs-lisp
+;; In elisp-mode, filter out `feature' entries that shadow defuns
+(when (and elisp-flag (> (length xref-items) 1))
+  (setq xref-items
+        (or (delq nil (mapcar (lambda (item)
+                                (when (not (string-match "(feature "
+                                                         (xref-item-summary item)))
+                                  item))
+                              xref-items))
+            xref-items)))
+```
+
+Additionally, when `ert-test-boundp` is available and the identifier names an ERT test, Hyperbole forces the `etags` backend to avoid interference from other backends.
+
+### xref buffer fix
+
+`hsys-xref.el` also patches `xref--item-at-point` to handle the edge case of being called at the very beginning of a buffer:
+
+```emacs-lisp
+(defun xref--item-at-point ()
+  "Fix next xref function to handle when called at beginning of buffer."
+  (get-text-property
+   (max (point-min) (if (eolp) (1- (point)) (point)))
+   'xref-item))
+```
+
+### Works with any xref backend
+
+Because the integration calls the standard `xref-find-backend` and `xref-backend-definitions` APIs, it works with any backend: `etags`, `eglot` (LSP), `citre`, `ggtags`, or any other backend registered via the xref protocol.
+
+---
+
+## Consult integration (`hsys-consult.el`)
+
+`hsys-consult.el` adds Hyperbole-specific grep and search commands built on top of the [`consult`](https://github.com/minad/consult) package. The `consult` package is not required at startup — it is installed automatically the first time a consult-specific Hyperbole command is invoked.
+
+### Enabling consult integration
+
+```emacs-lisp
+(defcustom hsys-consult-flag t
+  "Non-nil means use the consult package with vertico for filtering searches.")
+```
+
+When `hsys-consult-flag` is `t` and `consult` is installed, Hyperbole's non-consult-specific search and yank commands use `consult-grep` for interactive filtering. When `consult` is not yet installed and a consult-specific command is called, Hyperbole installs it automatically via the Emacs package system.
+
+### Checking whether consult is active
+
+```emacs-lisp
+(defun hsys-consult-active-p ()
+  "Return non-nil if `hsys-consult-flag' is true and `consult-grep' is fboundp."
+  (and hsys-consult-flag (fboundp 'consult-grep)))
+```
+
+### Core grep command
+
+`hsys-consult-grep` is the central function used by Hyperbole search commands:
+
+```emacs-lisp
+(defun hsys-consult-grep (grep-includes ripgrep-globs
+                          &optional regexp max-matches path-list prompt)
+  "Interactively search PATH-LIST with a consult package grep command.
+Use ripgrep (rg) if found, otherwise, plain grep.")
+```
+
+It selects between `consult-grep` and `consult-ripgrep` based on what is available, scopes the search to the specified paths, and filters by the given file-suffix patterns. When `max-matches` is `0`, it matches only headlines (lines beginning with `^[*#]+[ \t]+`).
+
+### Version requirement
+
+Consult version greater than `"0.32"` is required for multi-file search support. `hsys-consult-require-version` enforces this and installs/upgrades the package if needed:
+
+```emacs-lisp
+M-x hsys-consult-require-version
+```
+
+### Apropos with consult
+
+```emacs-lisp
+M-x hsys-consult-apropos
+;; With prefix arg: include all bound symbols
+```
+
+Uses `consult--read` over `obarray` with vertico completion to interactively select symbols, then runs `apropos` on the result.
+
+### Org directory search
+
+`hsys-org-consult-grep` (defined in `hsys-org.el`, built on `hsys-consult-grep`) searches all `.org` files in `org-directory`:
+
+```emacs-lisp
+M-x hsys-org-consult-grep
+;; With prefix arg: search headlines only
+```
+
+### Org Roam search
+
+`hsys-org-roam-consult-grep` (defined in `hsys-org-roam.el`) searches all files in `org-roam-directory`:
+
+```emacs-lisp
+M-x hsys-org-roam-consult-grep
+;; Requires: consult-org-roam package (auto-installed on first use)
+```
+
+The actual grep function used is determined by `consult-org-roam-grep-func`.
+
+---
+
+## Web & URL integration (`hsys-www.el`)
+
+`hsys-www.el` defines the `www-url` implicit button type and action type, which make any URL in any buffer an activatable hyperlink.
+
+### The `www-url` implicit button type
+
+```emacs-lisp
+(defib www-url ()
+  "Follow any non-ftp url (link) at point.
+The variable, `browse-url-browser-function', customizes the url browser used.")
+```
+
+Pressing the Action Key on a URL opens it in the configured browser. The type handles several contexts:
+
+| Buffer context | Action |
+|---|---|
+| `eww-mode` with link at point | `eww-follow-link` |
+| `eww-bookmark-mode` | `eww-bookmark-browse` |
+| `eww-history-mode` | `eww-history-browse` |
+| Any buffer with a URL at point | Opens URL via `browse-url-browser-function` |
+
+FTP URLs are excluded — they are handled by a separate Hyperbole implicit button type.
+
+### The `www-url` action type
+
+```emacs-lisp
+(defact www-url (url)
+  "Follow a link given by URL.")
+```
+
+If a URL has no scheme prefix, `https://` is prepended automatically. The browser is determined by `browse-url-browser-function`:
+
+```emacs-lisp
+;; Customize the browser used for URLs
+(setq browse-url-browser-function #'browse-url-default-browser)
+;; or
+(setq browse-url-browser-function #'eww-browse-url)
+```
+
+<Tip>
+You can configure `browse-url-browser-function` from the Hyperbole Customization menu (`{C-h h c}`), which also includes a setting for whether the browser reuses existing windows or opens new ones.
+</Tip>
+
+### mailto URL support
+
+`www-url-compose-mail` handles `mailto:` URLs by composing a mail message in Emacs:
+
+```emacs-lisp
+(www-url-compose-mail "colleague@example.org"
+                      "Subject line"
+                      "Optional body text")
+```
+
+### `hpath:find-file-urls-mode`
+
+When `hpath:find-file-urls-mode` is enabled, `find-file` and related commands recognize `http://` and `https://` URLs as file-like paths, opening them in the configured web browser instead of attempting a filesystem lookup.
+
+---
+
+## YouTube integration (`hsys-youtube.el`)
+
+`hsys-youtube.el` defines Action Button types for playing timestamped YouTube video segments directly from Emacs buffers.
+
+<Note>
+Load `hsys-youtube.el` explicitly — it is not loaded by default with Hyperbole. Add `(require 'hsys-youtube)` to your init file.
+</Note>
+
+### Action button types
+
+Embed any of the following Action Buttons in a buffer and activate them with the Action Key:
+
+<Tabs>
+  <Tab title="yt-play">
+    Play a YouTube video, optionally from a start time and to an end time.
+
+    ```text
+    <yt-play "WKwZHSbHmPg" "2:44">
+    <yt-play "WKwZHSbHmPg" "2m44s">
+    <yt-play "WKwZHSbHmPg" "164">
+    <yt-play "www.youtube.com/watch?v=WKwZHSbHmPg" "2m:44">
+    <yt-play "youtu.be/WKwZHSbHmPg&t=2m44s">
+    <yt-play "https://www.youtube.com/watch?v=WKwZHSbHmPg" "0h:2m:44s">
+
+    ;; With start and end time (uses the embed API)
+    <yt-play "WKwZHSbHmPg" "2m44s" "2m50s">
+    ```
+
+    The VIDEO-ID can be a bare video identifier, a `youtu.be` URL, or a full `youtube.com` URL. Time strings accept `H:M:S`, `HhMmSs`, or plain-seconds formats interchangeably.
+  </Tab>
+  <Tab title="yt-search">
+    Search YouTube for a term and open the results in the browser.
+
+    ```text
+    <yt-search "hypertext hyperbole">
+    ```
+
+    Uses `hyperbole-web-search` under the hood. The Assist Key (`C-u M-RET`) shows the search URL without opening the browser.
+  </Tab>
+  <Tab title="yt-info">
+    Open a web page showing full metadata for a video.
+
+    ```text
+    <yt-info "WKwZHSbHmPg">
+    ```
+
+    Opens `https://mattw.io/youtube-metadata/` with the video pre-loaded.
+  </Tab>
+  <Tab title="yt-url">
+    Return the constructed YouTube URL without opening it (useful in Lisp code).
+
+    ```text
+    <yt-url "WKwZHSbHmPg" "2m44s" "2m50s">
+    ```
+  </Tab>
+</Tabs>
+
+### URL format variables
+
+The URL templates used by `yt-play` and `yt-url` are configurable:
+
+```emacs-lisp
+;; For start-time only (uses watch API)
+(defvar hsys-youtube-start-format
+  "https://www.youtube.com/watch?v=%s&t=%s")
+
+;; For start + end time range (uses embed API)
+(defvar hsys-youtube-end-format
+  "https://www.youtube.com/embed/%s?autoplay=1&start=%s&end=%s")
+```
+
+### Assist Key on YouTube buttons
+
+Pressing the Assist Key (`C-u M-RET`) on a `yt-play` or `yt-url` button displays the resolved URL in the minibuffer without opening the browser — useful for verifying a timestamp before activating.
